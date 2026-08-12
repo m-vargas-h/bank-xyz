@@ -1,0 +1,14 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: bank-xyz-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bank_xyz
+    ports:
+      - "3306:3306"
+    volumes:
+      - bank_xyz_data:/var/lib/mysql
+
+volumes:
+  bank_xyz_data:
