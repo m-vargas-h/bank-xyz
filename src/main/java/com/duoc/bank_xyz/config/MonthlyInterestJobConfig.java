@@ -1,0 +1,67 @@
+package com.duoc.bank_xyz.config;
+
+import com.duoc.bank_xyz.model.Interes;
+import com.duoc.bank_xyz.processor.InteresProcessor;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.Step;
+import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.item.database.JdbcBatchItemWriter;
+import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
+import org.springframework.batch.item.file.FlatFileItemReader;
+import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import javax.sql.DataSource;
+
+@Configuration
+public class MonthlyInterestJobConfig {
+
+    @Bean
+    public FlatFileItemReader<Interes> interesReader() {
+        return new FlatFileItemReaderBuilder<Interes>()
+                .name("interesReader")
+                .resource(new ClassPathResource("intereses.csv"))
+                .delimited()
+                .names("cuentaId", "nombre", "saldo", "edad", "tipo")
+                .linesToSkip(1)
+                .targetType(Interes.class)
+                .build();
+    }
+
+    @Bean
+    public JdbcBatchItemWriter<Interes> interesWriter(DataSource dataSource) {
+        return new JdbcBatchItemWriterBuilder<Interes>()
+                .dataSource(dataSource)
+                .sql("INSERT INTO interes_reporte (cuenta_id, nombre, saldo, tipo, saldo_final, interes) " +
+                     "VALUES (:cuentaId, :nombre, :saldo, :tipo, :saldoFinal, :interes)")
+                .beanMapped()
+                .build();
+    }
+
+    @Bean
+    public Step monthlyInterestStep(JobRepository jobRepository,
+                                    PlatformTransactionManager transactionManager,
+                                    FlatFileItemReader<Interes> interesReader,
+                                    InteresProcessor interesProcessor,
+                                    JdbcBatchItemWriter<Interes> interesWriter) {
+        return new StepBuilder("monthlyInterestStep", jobRepository)
+                .<Interes, Interes>chunk(10, transactionManager)
+                .reader(interesReader)
+                .processor(interesProcessor)
+                .writer(interesWriter)
+                .build();
+    }
+
+    @Bean
+    public Job monthlyInterestJob(JobRepository jobRepository,
+                                  Step monthlyInterestStep) {
+        return new JobBuilder("monthlyInterestJob", jobRepository)
+                .start(monthlyInterestStep)
+                .build();
+    }
+}

@@ -29,4 +29,17 @@ public class JobController {
         jobLauncher.run(dailyTransactionReportJob, params);
         return "dailyTransactionReportJob ejecutado";
     }
+
+    @Autowired
+    @Qualifier("monthlyInterestJob")
+    private Job monthlyInterestJob;
+
+    @PostMapping("/monthly-interest")
+    public String runMonthlyInterestJob() throws Exception {
+        JobParameters params = new JobParametersBuilder()
+                .addLong("timestamp", System.currentTimeMillis())
+                .toJobParameters();
+        jobLauncher.run(monthlyInterestJob, params);
+        return "monthlyInterestJob ejecutado";
+    }
 }

@@ -14,5 +14,7 @@ public class Interes {
     private double saldo;
     private int edad;
     private String tipo;
+    private double saldoFinal;
+    private double interes;
     
 }
