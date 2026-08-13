@@ -6,21 +6,21 @@ Migración de procesos legacy del Banco XYZ utilizando Spring Batch.
 
 Este proyecto implementa tres jobs de Spring Batch para modernizar los procesos
 batch del sistema legacy del Banco XYZ, reemplazando scripts COBOL/Shell por
-soluciones Java modernas con Spring Boot 4.1.0 y Spring Batch.
+soluciones Java modernas con Spring Boot 3.3.5 y Spring Batch 5.1.2.
 
 ## Jobs implementados
 
-| Job | Descripción |
-|-----|-------------|
-| `dailyTransactionReportJob` | Procesa transacciones diarias, detecta anomalías y genera resumen |
-| `monthlyInterestJob` | Aplica intereses según tipo de cuenta y actualiza saldo final |
-| `annualStatementJob` | Compila movimientos anuales por cuenta para auditoría |
+| Job | Endpoint | Descripción |
+|-----|----------|-------------|
+| `dailyTransactionReportJob` | `POST /jobs/daily-transaction` | Procesa transacciones diarias, detecta anomalías y genera resumen |
+| `monthlyInterestJob` | `POST /jobs/monthly-interest` | Aplica intereses según tipo de cuenta y actualiza saldo final |
+| `annualStatementJob` | `POST /jobs/annual-statement` | Compila movimientos anuales por cuenta para auditoría |
 
 ## Tecnologías
 
 - Java 21
-- Spring Boot 4.1.0
-- Spring Batch
+- Spring Boot 3.3.5
+- Spring Batch 5.1.2
 - MySQL 8.0
 - Docker / Docker Compose
 - Lombok
@@ -51,6 +51,19 @@ docker-compose up -d
 ./mvnw spring-boot:run
 ```
 
+### 4. Ejecutar los jobs
+
+```bash
+# Job 1 - Reporte de transacciones diarias
+curl -X POST http://localhost:8080/jobs/daily-transaction
+
+# Job 2 - Cálculo de intereses mensuales
+curl -X POST http://localhost:8080/jobs/monthly-interest
+
+# Job 3 - Estado de cuentas anuales
+curl -X POST http://localhost:8080/jobs/annual-statement
+```
+
 ## Estructura del proyecto
 
 ```
@@ -63,10 +76,20 @@ docker-compose up -d
 │   │   │   └── com
 │   │   │       └── duoc
 │   │   │           └── bank_xyz
+│   │   │               ├── config
+│   │   │               │   ├── AnnualStatementJobConfig.java
+│   │   │               │   ├── DailyTransactionJobConfig.java
+│   │   │               │   └── MonthlyInterestJobConfig.java
+│   │   │               ├── controller
+│   │   │               │   └── JobController.java
 │   │   │               ├── model
 │   │   │               │   ├── CuentaAnual.java
 │   │   │               │   ├── Interes.java
 │   │   │               │   └── Transaccion.java
+│   │   │               ├── processor
+│   │   │               │   ├── CuentaAnualProcessor.java
+│   │   │               │   ├── InteresProcessor.java
+│   │   │               │   └── TransaccionProcessor.java
 │   │   │               └── BankXyzApplication.java
 │   │   └── resources
 │   │       ├── static
@@ -74,6 +97,7 @@ docker-compose up -d
 │   │       ├── application.properties
 │   │       ├── cuentas_anuales.csv
 │   │       ├── intereses.csv
+│   │       ├── schema.sql
 │   │       └── transacciones.csv
 │   └── test
 │       └── java
@@ -90,7 +114,15 @@ docker-compose up -d
 └── pom.xml
 ```
 
+## Manejo de anomalías
+
+| Job | Caso | Acción |
+|-----|------|--------|
+| `dailyTransactionReportJob` | Monto negativo o cero | Item descartado |
+| `monthlyInterestJob` | Saldo cero o negativo | Item descartado |
+| `monthlyInterestJob` | Tipo de cuenta desconocido | Item descartado |
+| `annualStatementJob` | Monto cero o negativo | Item descartado |
+
 ## Evidencia de ejecución
 
-*(Se adjuntará en entregas posteriores)*
-
+*(Capturas de consola adjuntas en la entrega)*
