@@ -42,4 +42,18 @@ public class JobController {
         jobLauncher.run(monthlyInterestJob, params);
         return "monthlyInterestJob ejecutado";
     }
+
+    @Autowired
+    @Qualifier("annualStatementJob")
+    private Job annualStatementJob;
+
+    @PostMapping("/annual-statement")
+    public String runAnnualStatementJob() throws Exception {
+        JobParameters params = new JobParametersBuilder()
+                .addLong("timestamp", System.currentTimeMillis())
+                .toJobParameters();
+        jobLauncher.run(annualStatementJob, params);
+        return "annualStatementJob ejecutado";
+    }
+    
 }

@@ -15,3 +15,13 @@ CREATE TABLE IF NOT EXISTS interes_reporte (
     interes       DOUBLE
 );
 
+CREATE TABLE IF NOT EXISTS cuenta_anual_reporte (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    cuenta_id     INT,
+    fecha         VARCHAR(20),
+    transaccion   VARCHAR(20),
+    monto         DOUBLE,
+    descripcion   VARCHAR(255),
+    estado        VARCHAR(20)
+);
+
