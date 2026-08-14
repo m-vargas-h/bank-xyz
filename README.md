@@ -70,6 +70,8 @@ curl -X POST http://localhost:8080/jobs/annual-statement
 ├── .mvn
 │   └── wrapper
 │       └── maven-wrapper.properties
+├── docs
+│   └── images
 ├── src
 │   ├── main
 │   │   ├── java
