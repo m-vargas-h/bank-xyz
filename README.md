@@ -125,4 +125,83 @@ curl -X POST http://localhost:8080/jobs/annual-statement
 
 ## Evidencia de ejecución
 
-*(Capturas de consola adjuntas en la entrega)*
+### 1. Levantar base de datos
+
+```bash
+docker-compose up -d
+```
+
+![Docker Compose](docs/images/evidencia_docker.png)
+
+---
+
+### 2. Iniciar aplicación
+
+```bash
+./mvnw spring-boot:run
+```
+
+![App iniciada](docs/images/evidencia_app.png)
+![App iniciada consola](docs/images/evidencia_app1.png)
+
+---
+
+### 3. Job 1 - Reporte de transacciones diarias
+
+```bash
+Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transaction"
+```
+
+![Job 1 ejecución](docs/images/evidencia_job1_ejecucion.png)
+![Job 1 consola](docs/images/evidencia_job1_ejecucion1.png)
+
+```bash
+docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM transaccion_reporte;"
+```
+
+![Job 1 base de datos](docs/images/evidencia_job1_db.png)
+
+---
+
+### 4. Job 2 - Cálculo de intereses mensuales
+
+```bash
+Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/monthly-interest"
+```
+
+![Job 2 ejecución](docs/images/evidencia_job2_ejecucion.png)
+![Job 2 consola](docs/images/evidencia_job2_ejecucion1.png)
+
+```bash
+docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM interes_reporte;"
+```
+
+![Job 2 base de datos](docs/images/evidencia_job2_db.png)
+
+---
+
+### 5. Job 3 - Estado de cuentas anuales
+
+```bash
+Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/annual-statement"
+```
+
+![Job 3 ejecución](docs/images/evidencia_job3_ejecucion.png)
+![Job 3 consola](docs/images/evidencia_job3_ejecucion1.png)
+
+```bash
+docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM cuenta_anual_reporte;"
+```
+
+![Job 3 base de datos](docs/images/evidencia_job3_db.png)
+
+---
+
+### 6. Tests
+
+```bash
+./mvnw clean test
+```
+
+![Test inicio](docs/images/evidencia_test.png)
+![Test resultado](docs/images/evidencia_test1.png)
