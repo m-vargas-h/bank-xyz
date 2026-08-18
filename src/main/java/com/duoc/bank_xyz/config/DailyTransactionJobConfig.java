@@ -11,9 +11,13 @@ import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
+import org.springframework.batch.item.support.SynchronizedItemStreamReader;
+import org.springframework.batch.item.support.builder.SynchronizedItemStreamReaderBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
@@ -45,15 +49,17 @@ public class DailyTransactionJobConfig {
 
     @Bean
     public Step dailyTransactionStep(JobRepository jobRepository,
-                                     PlatformTransactionManager transactionManager,
-                                     FlatFileItemReader<Transaccion> transaccionReader,
-                                     TransaccionProcessor transaccionProcessor,
-                                     JdbcBatchItemWriter<Transaccion> transaccionWriter) {
+                                    PlatformTransactionManager transactionManager,
+                                    SynchronizedItemStreamReader<Transaccion> synchronizedTransaccionReader,
+                                    TransaccionProcessor transaccionProcessor,
+                                    JdbcBatchItemWriter<Transaccion> transaccionWriter,
+                                    TaskExecutor dailyTransactionTaskExecutor) {
         return new StepBuilder("dailyTransactionStep", jobRepository)
-                .<Transaccion, Transaccion>chunk(10, transactionManager)
-                .reader(transaccionReader)
+                .<Transaccion, Transaccion>chunk(5, transactionManager)
+                .reader(synchronizedTransaccionReader)
                 .processor(transaccionProcessor)
                 .writer(transaccionWriter)
+                .taskExecutor(dailyTransactionTaskExecutor)
                 .build();
     }
 
@@ -62,6 +68,24 @@ public class DailyTransactionJobConfig {
                                          Step dailyTransactionStep) {
         return new JobBuilder("dailyTransactionReportJob", jobRepository)
                 .start(dailyTransactionStep)
+                .build();
+    }
+
+    @Bean
+    public TaskExecutor dailyTransactionTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(3);
+        executor.setMaxPoolSize(3);
+        executor.setQueueCapacity(10);
+        executor.setThreadNamePrefix("daily-batch-");
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean
+    public SynchronizedItemStreamReader<Transaccion> synchronizedTransaccionReader() {
+        return new SynchronizedItemStreamReaderBuilder<Transaccion>()
+                .delegate(transaccionReader())
                 .build();
     }
 }

@@ -11,9 +11,13 @@ import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
+import org.springframework.batch.item.support.SynchronizedItemStreamReader;
+import org.springframework.batch.item.support.builder.SynchronizedItemStreamReaderBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
@@ -46,14 +50,16 @@ public class AnnualStatementJobConfig {
     @Bean
     public Step annualStatementStep(JobRepository jobRepository,
                                     PlatformTransactionManager transactionManager,
-                                    FlatFileItemReader<CuentaAnual> cuentaAnualReader,
+                                    SynchronizedItemStreamReader<CuentaAnual> synchronizedCuentaAnualReader,
                                     CuentaAnualProcessor cuentaAnualProcessor,
-                                    JdbcBatchItemWriter<CuentaAnual> cuentaAnualWriter) {
+                                    JdbcBatchItemWriter<CuentaAnual> cuentaAnualWriter,
+                                    TaskExecutor annualStatementTaskExecutor) {
         return new StepBuilder("annualStatementStep", jobRepository)
-                .<CuentaAnual, CuentaAnual>chunk(10, transactionManager)
-                .reader(cuentaAnualReader)
+                .<CuentaAnual, CuentaAnual>chunk(5, transactionManager)
+                .reader(synchronizedCuentaAnualReader)
                 .processor(cuentaAnualProcessor)
                 .writer(cuentaAnualWriter)
+                .taskExecutor(annualStatementTaskExecutor)
                 .build();
     }
 
@@ -62,6 +68,24 @@ public class AnnualStatementJobConfig {
                                   Step annualStatementStep) {
         return new JobBuilder("annualStatementJob", jobRepository)
                 .start(annualStatementStep)
+                .build();
+    }
+
+    @Bean
+    public TaskExecutor annualStatementTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(3);
+        executor.setMaxPoolSize(3);
+        executor.setQueueCapacity(10);
+        executor.setThreadNamePrefix("annual-batch-");
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean
+    public SynchronizedItemStreamReader<CuentaAnual> synchronizedCuentaAnualReader() {
+        return new SynchronizedItemStreamReaderBuilder<CuentaAnual>()
+                .delegate(cuentaAnualReader())
                 .build();
     }
 }

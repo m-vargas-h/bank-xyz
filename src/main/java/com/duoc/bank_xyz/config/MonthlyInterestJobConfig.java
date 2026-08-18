@@ -11,9 +11,13 @@ import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
+import org.springframework.batch.item.support.SynchronizedItemStreamReader;
+import org.springframework.batch.item.support.builder.SynchronizedItemStreamReaderBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
@@ -46,14 +50,16 @@ public class MonthlyInterestJobConfig {
     @Bean
     public Step monthlyInterestStep(JobRepository jobRepository,
                                     PlatformTransactionManager transactionManager,
-                                    FlatFileItemReader<Interes> interesReader,
+                                    SynchronizedItemStreamReader<Interes> synchronizedInteresReader,
                                     InteresProcessor interesProcessor,
-                                    JdbcBatchItemWriter<Interes> interesWriter) {
+                                    JdbcBatchItemWriter<Interes> interesWriter,
+                                    TaskExecutor monthlyInterestTaskExecutor) {
         return new StepBuilder("monthlyInterestStep", jobRepository)
-                .<Interes, Interes>chunk(10, transactionManager)
-                .reader(interesReader)
+                .<Interes, Interes>chunk(5, transactionManager)
+                .reader(synchronizedInteresReader)
                 .processor(interesProcessor)
                 .writer(interesWriter)
+                .taskExecutor(monthlyInterestTaskExecutor)
                 .build();
     }
 
@@ -62,6 +68,24 @@ public class MonthlyInterestJobConfig {
                                   Step monthlyInterestStep) {
         return new JobBuilder("monthlyInterestJob", jobRepository)
                 .start(monthlyInterestStep)
+                .build();
+    }
+
+    @Bean
+    public TaskExecutor monthlyInterestTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(3);
+        executor.setMaxPoolSize(3);
+        executor.setQueueCapacity(10);
+        executor.setThreadNamePrefix("monthly-batch-");
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean
+    public SynchronizedItemStreamReader<Interes> synchronizedInteresReader() {
+        return new SynchronizedItemStreamReaderBuilder<Interes>()
+                .delegate(interesReader())
                 .build();
     }
 }
