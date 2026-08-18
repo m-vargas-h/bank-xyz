@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Carpeta de material educativo
+/material/
+
