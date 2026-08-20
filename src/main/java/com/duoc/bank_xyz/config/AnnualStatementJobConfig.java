@@ -1,6 +1,7 @@
 package com.duoc.bank_xyz.config;
 
 import com.duoc.bank_xyz.model.CuentaAnual;
+import com.duoc.bank_xyz.policy.BankSkipPolicy;
 import com.duoc.bank_xyz.processor.CuentaAnualProcessor;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -53,13 +54,16 @@ public class AnnualStatementJobConfig {
                                     SynchronizedItemStreamReader<CuentaAnual> synchronizedCuentaAnualReader,
                                     CuentaAnualProcessor cuentaAnualProcessor,
                                     JdbcBatchItemWriter<CuentaAnual> cuentaAnualWriter,
-                                    TaskExecutor annualStatementTaskExecutor) {
+                                    TaskExecutor annualStatementTaskExecutor,
+                                    BankSkipPolicy bankSkipPolicy) {
         return new StepBuilder("annualStatementStep", jobRepository)
                 .<CuentaAnual, CuentaAnual>chunk(5, transactionManager)
                 .reader(synchronizedCuentaAnualReader)
                 .processor(cuentaAnualProcessor)
                 .writer(cuentaAnualWriter)
                 .taskExecutor(annualStatementTaskExecutor)
+                .faultTolerant()
+                .skipPolicy(bankSkipPolicy)
                 .build();
     }
 

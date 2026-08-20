@@ -1,6 +1,7 @@
 package com.duoc.bank_xyz.config;
 
 import com.duoc.bank_xyz.model.Transaccion;
+import com.duoc.bank_xyz.policy.BankSkipPolicy;
 import com.duoc.bank_xyz.processor.TransaccionProcessor;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -53,13 +54,16 @@ public class DailyTransactionJobConfig {
                                     SynchronizedItemStreamReader<Transaccion> synchronizedTransaccionReader,
                                     TransaccionProcessor transaccionProcessor,
                                     JdbcBatchItemWriter<Transaccion> transaccionWriter,
-                                    TaskExecutor dailyTransactionTaskExecutor) {
+                                    TaskExecutor dailyTransactionTaskExecutor,
+                                    BankSkipPolicy bankSkipPolicy) {
         return new StepBuilder("dailyTransactionStep", jobRepository)
                 .<Transaccion, Transaccion>chunk(5, transactionManager)
                 .reader(synchronizedTransaccionReader)
                 .processor(transaccionProcessor)
                 .writer(transaccionWriter)
                 .taskExecutor(dailyTransactionTaskExecutor)
+                .faultTolerant()
+                .skipPolicy(bankSkipPolicy)
                 .build();
     }
 
