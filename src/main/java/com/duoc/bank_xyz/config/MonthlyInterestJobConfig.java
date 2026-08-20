@@ -1,9 +1,11 @@
 package com.duoc.bank_xyz.config;
 
+import com.duoc.bank_xyz.listener.BankSkipListener;
 import com.duoc.bank_xyz.model.Interes;
 import com.duoc.bank_xyz.policy.BankSkipPolicy;
 import com.duoc.bank_xyz.processor.InteresProcessor;
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.SkipListener;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
@@ -55,7 +57,8 @@ public class MonthlyInterestJobConfig {
                                     InteresProcessor interesProcessor,
                                     JdbcBatchItemWriter<Interes> interesWriter,
                                     TaskExecutor monthlyInterestTaskExecutor,
-                                    BankSkipPolicy bankSkipPolicy) {
+                                    BankSkipPolicy bankSkipPolicy,
+                                    BankSkipListener<Interes, Interes> bankSkipListener) {
         return new StepBuilder("monthlyInterestStep", jobRepository)
                 .<Interes, Interes>chunk(5, transactionManager)
                 .reader(synchronizedInteresReader)
@@ -64,6 +67,9 @@ public class MonthlyInterestJobConfig {
                 .taskExecutor(monthlyInterestTaskExecutor)
                 .faultTolerant()
                 .skipPolicy(bankSkipPolicy)
+                .retry(Exception.class)
+                .retryLimit(3)
+                .listener((SkipListener<Interes, Interes>) bankSkipListener)
                 .build();
     }
 
