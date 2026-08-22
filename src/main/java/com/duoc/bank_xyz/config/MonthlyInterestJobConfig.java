@@ -1,6 +1,7 @@
 package com.duoc.bank_xyz.config;
 
 import com.duoc.bank_xyz.listener.BankSkipListener;
+import com.duoc.bank_xyz.listener.JobCompletionListener;
 import com.duoc.bank_xyz.model.Interes;
 import com.duoc.bank_xyz.policy.BankSkipPolicy;
 import com.duoc.bank_xyz.processor.InteresProcessor;
@@ -75,8 +76,10 @@ public class MonthlyInterestJobConfig {
 
     @Bean
     public Job monthlyInterestJob(JobRepository jobRepository,
-                                  Step monthlyInterestStep) {
+                                Step monthlyInterestStep,
+                                JobCompletionListener jobCompletionListener) {
         return new JobBuilder("monthlyInterestJob", jobRepository)
+                .listener(jobCompletionListener)
                 .start(monthlyInterestStep)
                 .build();
     }

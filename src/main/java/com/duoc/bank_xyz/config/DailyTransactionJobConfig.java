@@ -1,6 +1,7 @@
 package com.duoc.bank_xyz.config;
 
 import com.duoc.bank_xyz.listener.BankSkipListener;
+import com.duoc.bank_xyz.listener.JobCompletionListener;
 import com.duoc.bank_xyz.model.Transaccion;
 import com.duoc.bank_xyz.policy.BankSkipPolicy;
 import com.duoc.bank_xyz.processor.TransaccionProcessor;
@@ -75,8 +76,10 @@ public class DailyTransactionJobConfig {
 
     @Bean
     public Job dailyTransactionReportJob(JobRepository jobRepository,
-                                         Step dailyTransactionStep) {
+                                        Step dailyTransactionStep,
+                                        JobCompletionListener jobCompletionListener) {
         return new JobBuilder("dailyTransactionReportJob", jobRepository)
+                .listener(jobCompletionListener)
                 .start(dailyTransactionStep)
                 .build();
     }

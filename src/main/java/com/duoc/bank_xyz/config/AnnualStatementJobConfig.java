@@ -1,6 +1,7 @@
 package com.duoc.bank_xyz.config;
 
 import com.duoc.bank_xyz.listener.BankSkipListener;
+import com.duoc.bank_xyz.listener.JobCompletionListener;
 import com.duoc.bank_xyz.model.CuentaAnual;
 import com.duoc.bank_xyz.policy.BankSkipPolicy;
 import com.duoc.bank_xyz.processor.CuentaAnualProcessor;
@@ -75,8 +76,10 @@ public class AnnualStatementJobConfig {
 
     @Bean
     public Job annualStatementJob(JobRepository jobRepository,
-                                  Step annualStatementStep) {
+                                Step annualStatementStep,
+                                JobCompletionListener jobCompletionListener) {
         return new JobBuilder("annualStatementJob", jobRepository)
+                .listener(jobCompletionListener)
                 .start(annualStatementStep)
                 .build();
     }
