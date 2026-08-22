@@ -5,6 +5,8 @@ import com.duoc.bank_xyz.listener.JobCompletionListener;
 import com.duoc.bank_xyz.model.Transaccion;
 import com.duoc.bank_xyz.policy.BankSkipPolicy;
 import com.duoc.bank_xyz.processor.TransaccionProcessor;
+import com.duoc.bank_xyz.writer.TransaccionResumenWriter;
+
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.SkipListener;
 import org.springframework.batch.core.Step;
@@ -75,12 +77,25 @@ public class DailyTransactionJobConfig {
     }
 
     @Bean
+    public Step dailyTransactionResumenStep(JobRepository jobRepository,
+                                            PlatformTransactionManager transactionManager,
+                                            TransaccionResumenWriter transaccionResumenWriter) {
+        return new StepBuilder("dailyTransactionResumenStep", jobRepository)
+                .<Transaccion, Transaccion>chunk(100, transactionManager)
+                .reader(transaccionReader())
+                .writer(transaccionResumenWriter)
+                .build();
+    }
+
+    @Bean
     public Job dailyTransactionReportJob(JobRepository jobRepository,
                                         Step dailyTransactionStep,
+                                        Step dailyTransactionResumenStep,
                                         JobCompletionListener jobCompletionListener) {
         return new JobBuilder("dailyTransactionReportJob", jobRepository)
                 .listener(jobCompletionListener)
                 .start(dailyTransactionStep)
+                .next(dailyTransactionResumenStep)
                 .build();
     }
 

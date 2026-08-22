@@ -14,7 +14,7 @@ Cada proceso batch está implementado como un Job independiente, lo que permite 
 
 ## Arquitectura
 
-El proyecto sigue la arquitectura estándar de Spring Batch, donde cada Job está compuesto por un Step que encadena tres componentes principales:
+El proyecto sigue la arquitectura estándar de Spring Batch, donde cada Job está compuesto por uno o más Steps que encadenan tres componentes principales:
 
 - **ItemReader:** Lee los datos desde un archivo CSV línea por línea y los convierte en objetos Java. Se utiliza `FlatFileItemReader` configurado con el delimitador y los nombres de columna correspondientes a cada archivo.
 
@@ -25,7 +25,11 @@ El proyecto sigue la arquitectura estándar de Spring Batch, donde cada Job est�
 El flujo de datos es el siguiente:
 ```
 CSV → ItemReader → ItemProcessor → ItemWriter → MySQL
+                                       ↓
+                               ResumenWriter → MySQL (tablas de resumen)
 ```
+
+Los Jobs de transacciones diarias y estados de cuenta anuales incorporan un segundo Step que consolida los datos procesados en tablas de resumen independientes.
 
 Los Jobs se lanzan de forma manual a través de endpoints REST expuestos por el `JobController`, lo que permite ejecutar cada proceso de forma independiente y controlada.
 
@@ -35,13 +39,14 @@ Los Jobs se lanzan de forma manual a través de endpoints REST expuestos por el 
 
 ### dailyTransactionReportJob
 
-Procesa el archivo `transacciones.csv` que contiene los movimientos diarios del banco. El Processor valida que el monto de cada transacción sea mayor a cero, descartando aquellas con monto negativo o igual a cero como anomalías. Las transacciones válidas se persisten en la tabla `transaccion_reporte` con estado `PROCESADO`.
+Procesa el archivo `transacciones.csv` en dos Steps encadenados. El Processor valida que el monto de cada transacción sea mayor a cero, descartando aquellas con monto negativo o igual a cero como anomalías. Las transacciones válidas se persisten en `transaccion_reporte`. Un segundo Step genera un resumen consolidado con el total de transacciones procesadas, monto total y cantidad de anomalías detectadas, persistido en `transaccion_resumen`.
 
 | Componente | Clase | Descripción |
 |------------|-------|-------------|
 | Reader | `FlatFileItemReader` | Lee `transacciones.csv` |
 | Processor | `TransaccionProcessor` | Descarta montos negativos o cero |
-| Writer | `JdbcBatchItemWriter` | Inserta en `transaccion_reporte` |
+| Writer (Step 1) | `JdbcBatchItemWriter` | Inserta en `transaccion_reporte` |
+| Writer (Step 2) | `TransaccionResumenWriter` | Consolida resumen en `transaccion_resumen` |
 
 ---
 
@@ -59,13 +64,16 @@ Procesa el archivo `intereses.csv` que contiene las cuentas bancarias con sus sa
 
 ### annualStatementJob
 
-Procesa el archivo `cuentas_anuales.csv` que contiene los movimientos anuales por cuenta para fines de auditoría. El Processor descarta movimientos con monto cero o negativo. Los movimientos válidos se persisten en la tabla `cuenta_anual_reporte` con estado `PROCESADO`.
+Procesa el archivo `cuentas_anuales.csv` en dos Steps encadenados. El Processor descarta movimientos con monto cero o negativo. Los movimientos válidos se persisten en `cuenta_anual_reporte`. Un segundo Step consolida los movimientos agrupados por `cuenta_id`, calculando total de movimientos y monto acumulado por cuenta, persistido en `cuenta_anual_resumen` para uso en auditorías.
 
 | Componente | Clase | Descripción |
 |------------|-------|-------------|
 | Reader | `FlatFileItemReader` | Lee `cuentas_anuales.csv` |
 | Processor | `CuentaAnualProcessor` | Descarta movimientos sin monto válido |
-| Writer | `JdbcBatchItemWriter` | Inserta en `cuenta_anual_reporte` |
+| Writer (Step 1) | `JdbcBatchItemWriter` | Inserta en `cuenta_anual_reporte` |
+| Writer (Step 2) | `CuentaAnualResumenWriter` | Consolida resumen en `cuenta_anual_resumen` |
+
+---
 
 ## Tecnologías
 
@@ -123,6 +131,20 @@ curl -X POST http://localhost:8080/jobs/annual-statement
 │       └── maven-wrapper.properties
 ├── docs
 │   └── images
+│       ├── evidencia_app.png
+│       ├── evidencia_app1.png
+│       ├── evidencia_docker.png
+│       ├── evidencia_job1_db.png
+│       ├── evidencia_job1_ejecucion.png
+│       ├── evidencia_job1_ejecucion1.png
+│       ├── evidencia_job2_db.png
+│       ├── evidencia_job2_ejecucion.png
+│       ├── evidencia_job2_ejecucion1.png
+│       ├── evidencia_job3_db.png
+│       ├── evidencia_job3_ejecucion.png
+│       ├── evidencia_job3_ejecucion1.png
+│       ├── evidencia_test.png
+│       └── evidencia_test1.png
 ├── src
 │   ├── main
 │   │   ├── java
@@ -135,14 +157,24 @@ curl -X POST http://localhost:8080/jobs/annual-statement
 │   │   │               │   └── MonthlyInterestJobConfig.java
 │   │   │               ├── controller
 │   │   │               │   └── JobController.java
+│   │   │               ├── listener
+│   │   │               │   ├── BankSkipListener.java
+│   │   │               │   └── JobCompletionListener.java
 │   │   │               ├── model
 │   │   │               │   ├── CuentaAnual.java
+│   │   │               │   ├── CuentaAnualResumen.java
 │   │   │               │   ├── Interes.java
-│   │   │               │   └── Transaccion.java
+│   │   │               │   ├── Transaccion.java
+│   │   │               │   └── TransaccionResumen.java
+│   │   │               ├── policy
+│   │   │               │   └── BankSkipPolicy.java
 │   │   │               ├── processor
 │   │   │               │   ├── CuentaAnualProcessor.java
 │   │   │               │   ├── InteresProcessor.java
 │   │   │               │   └── TransaccionProcessor.java
+│   │   │               ├── writer
+│   │   │               │   ├── CuentaAnualResumenWriter.java
+│   │   │               │   └── TransaccionResumenWriter.java
 │   │   │               └── BankXyzApplication.java
 │   │   └── resources
 │   │       ├── static
@@ -182,9 +214,43 @@ En este proyecto cada Processor implementa esta estrategia para los siguientes c
 
 Cada vez que un item es descartado, el Processor imprime un mensaje en consola identificando el registro afectado, lo que permite trazabilidad sobre los datos que no fueron procesados.
 
+---
+
+## Optimización y resiliencia (Semana 2)
+
+En la segunda semana se incorporaron mejoras orientadas a optimizar el rendimiento y garantizar la estabilidad del sistema ante errores.
+
+### Procesamiento paralelo
+
+Cada Job cuenta con un `ThreadPoolTaskExecutor` configurado con 3 hilos, permitiendo procesar múltiples chunks simultáneamente. Para garantizar thread-safety en la lectura, el `FlatFileItemReader` de cada Job está envuelto en un `SynchronizedItemStreamReader`.
+
+| Parámetro | Valor |
+|---|---|
+| Chunk size | 5 |
+| Hilos por Job | 3 |
+| Prefijos de hilo | `daily-batch-*`, `monthly-batch-*`, `annual-batch-*` |
+
+### Tolerancia a fallos
+
+Se implementó una `BankSkipPolicy` personalizada que permite omitir registros problemáticos sin detener el Job, con un límite de 10 omisiones por ejecución. Complementariamente, cada Step cuenta con una `RetryPolicy` que reintenta hasta 3 veces ante errores transitorios.
+
+| Política | Clase | Límite |
+|---|---|---|
+| Skip | `BankSkipPolicy` | 10 omisiones |
+| Retry | `SimpleRetryPolicy` | 3 reintentos |
+
+### Listeners
+
+| Listener | Clase | Función |
+|---|---|---|
+| Job | `JobCompletionListener` | Loguea nombre, estado y duración de cada Job |
+| Skip | `BankSkipListener` | Loguea registros omitidos en lectura, proceso y escritura |
+
+---
+
 ## Tests
 
-El proyecto incluye un test de contexto (`contextLoads`) que verifica que la aplicación levanta correctamente con todos sus beans y configuraciones. 
+El proyecto incluye un test de contexto (`contextLoads`) que verifica que la aplicación levanta correctamente con todos sus beans y configuraciones.
 
 Para evitar dependencia de una base de datos MySQL en ejecución durante los tests, se utiliza H2 como base de datos en memoria. Esto se logra mediante `@TestPropertySource` que sobreescribe las propiedades de conexión definidas en `application.properties` únicamente durante la ejecución de los tests, sin modificar la configuración de producción.
 
@@ -233,6 +299,7 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transactio
 
 ```bash
 docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM transaccion_reporte;"
+docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM transaccion_resumen;"
 ```
 
 ![Job 1 base de datos](docs/images/evidencia_job1_db.png)
@@ -267,9 +334,9 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/annual-statement
 
 ```bash
 docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM cuenta_anual_reporte;"
+docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM cuenta_anual_resumen;"
 ```
 
 ![Job 3 base de datos](docs/images/evidencia_job3_db.png)
 
 ---
-

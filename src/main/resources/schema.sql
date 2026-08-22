@@ -25,3 +25,18 @@ CREATE TABLE IF NOT EXISTS cuenta_anual_reporte (
     estado        VARCHAR(20)
 );
 
+CREATE TABLE IF NOT EXISTS transaccion_resumen (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    fecha_reporte   VARCHAR(20),
+    total_procesadas INT,
+    monto_total     DOUBLE,
+    total_anomalias INT
+);
+
+CREATE TABLE IF NOT EXISTS cuenta_anual_resumen (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    cuenta_id       INT,
+    total_movimientos INT,
+    monto_total     DOUBLE,
+    fecha_reporte   VARCHAR(20)
+);

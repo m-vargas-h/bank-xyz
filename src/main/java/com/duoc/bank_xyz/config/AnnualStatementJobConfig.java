@@ -5,6 +5,8 @@ import com.duoc.bank_xyz.listener.JobCompletionListener;
 import com.duoc.bank_xyz.model.CuentaAnual;
 import com.duoc.bank_xyz.policy.BankSkipPolicy;
 import com.duoc.bank_xyz.processor.CuentaAnualProcessor;
+import com.duoc.bank_xyz.writer.CuentaAnualResumenWriter;
+
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.SkipListener;
 import org.springframework.batch.core.Step;
@@ -75,12 +77,25 @@ public class AnnualStatementJobConfig {
     }
 
     @Bean
+    public Step annualStatementResumenStep(JobRepository jobRepository,
+                                        PlatformTransactionManager transactionManager,
+                                        CuentaAnualResumenWriter cuentaAnualResumenWriter) {
+        return new StepBuilder("annualStatementResumenStep", jobRepository)
+                .<CuentaAnual, CuentaAnual>chunk(100, transactionManager)
+                .reader(cuentaAnualReader())
+                .writer(cuentaAnualResumenWriter)
+                .build();
+    }
+
+    @Bean
     public Job annualStatementJob(JobRepository jobRepository,
                                 Step annualStatementStep,
+                                Step annualStatementResumenStep,
                                 JobCompletionListener jobCompletionListener) {
         return new JobBuilder("annualStatementJob", jobRepository)
                 .listener(jobCompletionListener)
                 .start(annualStatementStep)
+                .next(annualStatementResumenStep)
                 .build();
     }
 
