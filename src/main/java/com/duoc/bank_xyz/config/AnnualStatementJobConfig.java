@@ -19,6 +19,7 @@ import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.batch.item.support.SynchronizedItemStreamReader;
 import org.springframework.batch.item.support.builder.SynchronizedItemStreamReaderBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
@@ -30,6 +31,12 @@ import javax.sql.DataSource;
 
 @Configuration
 public class AnnualStatementJobConfig {
+
+    @Value("${batch.thread-pool-size}")
+    private int threadPoolSize;
+
+    @Value("${batch.chunk-size}")
+    private int chunkSize;
 
     @Bean
     public FlatFileItemReader<CuentaAnual> cuentaAnualReader() {
@@ -63,7 +70,7 @@ public class AnnualStatementJobConfig {
                                     BankSkipPolicy bankSkipPolicy,
                                     BankSkipListener<CuentaAnual, CuentaAnual> bankSkipListener) {
         return new StepBuilder("annualStatementStep", jobRepository)
-                .<CuentaAnual, CuentaAnual>chunk(5, transactionManager)
+                .<CuentaAnual, CuentaAnual>chunk(chunkSize, transactionManager)
                 .reader(synchronizedCuentaAnualReader)
                 .processor(cuentaAnualProcessor)
                 .writer(cuentaAnualWriter)
@@ -102,8 +109,8 @@ public class AnnualStatementJobConfig {
     @Bean
     public TaskExecutor annualStatementTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(3);
-        executor.setMaxPoolSize(3);
+        executor.setCorePoolSize(threadPoolSize);
+        executor.setMaxPoolSize(threadPoolSize);
         executor.setQueueCapacity(10);
         executor.setThreadNamePrefix("annual-batch-");
         executor.initialize();

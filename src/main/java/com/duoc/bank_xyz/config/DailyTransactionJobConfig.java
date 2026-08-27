@@ -19,6 +19,7 @@ import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.batch.item.support.SynchronizedItemStreamReader;
 import org.springframework.batch.item.support.builder.SynchronizedItemStreamReaderBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
@@ -30,6 +31,12 @@ import javax.sql.DataSource;
 
 @Configuration
 public class DailyTransactionJobConfig {
+
+    @Value("${batch.thread-pool-size}")
+    private int threadPoolSize;
+
+    @Value("${batch.chunk-size}")
+    private int chunkSize;
 
     @Bean
     public FlatFileItemReader<Transaccion> transaccionReader() {
@@ -63,7 +70,7 @@ public class DailyTransactionJobConfig {
                                     BankSkipPolicy bankSkipPolicy,
                                     BankSkipListener<Transaccion, Transaccion> bankSkipListener) {
         return new StepBuilder("dailyTransactionStep", jobRepository)
-                .<Transaccion, Transaccion>chunk(5, transactionManager)
+                .<Transaccion, Transaccion>chunk(chunkSize, transactionManager)
                 .reader(synchronizedTransaccionReader)
                 .processor(transaccionProcessor)
                 .writer(transaccionWriter)
@@ -102,8 +109,8 @@ public class DailyTransactionJobConfig {
     @Bean
     public TaskExecutor dailyTransactionTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(3);
-        executor.setMaxPoolSize(3);
+        executor.setCorePoolSize(threadPoolSize);
+        executor.setMaxPoolSize(threadPoolSize);
         executor.setQueueCapacity(10);
         executor.setThreadNamePrefix("daily-batch-");
         executor.initialize();

@@ -9,11 +9,12 @@ public class TransaccionProcessor implements ItemProcessor<Transaccion, Transacc
 
     @Override
     public Transaccion process(Transaccion transaccion) throws Exception {
-        if (transaccion.getMonto() <= 0) {
+        if (transaccion.getMonto() == null || transaccion.getMonto() <= 0) {
             System.out.println("Transaccion anomala detectada, id: " + transaccion.getId()
                     + " monto: " + transaccion.getMonto());
             return null;
         }
         return transaccion;
     }
+    
 }

@@ -11,10 +11,10 @@ public class Interes {
 
     private int cuentaId;
     private String nombre;
-    private double saldo;
-    private int edad;
+    private Double saldo;
+    private Integer edad;
     private String tipo;
-    private double saldoFinal;
-    private double interes;
+    private Double saldoFinal;
+    private Double interes;
     
 }

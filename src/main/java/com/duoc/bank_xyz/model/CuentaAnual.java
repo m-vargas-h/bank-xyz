@@ -12,7 +12,7 @@ public class CuentaAnual {
     private int cuentaId;
     private String fecha;
     private String transaccion;
-    private double monto;
+    private Double monto;
     private String descripcion;
     
 }

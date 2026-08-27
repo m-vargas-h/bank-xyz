@@ -17,6 +17,7 @@ import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.batch.item.support.SynchronizedItemStreamReader;
 import org.springframework.batch.item.support.builder.SynchronizedItemStreamReaderBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
@@ -28,6 +29,12 @@ import javax.sql.DataSource;
 
 @Configuration
 public class MonthlyInterestJobConfig {
+
+    @Value("${batch.thread-pool-size}")
+    private int threadPoolSize;
+
+    @Value("${batch.chunk-size}")
+    private int chunkSize;
 
     @Bean
     public FlatFileItemReader<Interes> interesReader() {
@@ -61,7 +68,7 @@ public class MonthlyInterestJobConfig {
                                     BankSkipPolicy bankSkipPolicy,
                                     BankSkipListener<Interes, Interes> bankSkipListener) {
         return new StepBuilder("monthlyInterestStep", jobRepository)
-                .<Interes, Interes>chunk(5, transactionManager)
+                .<Interes, Interes>chunk(chunkSize, transactionManager)
                 .reader(synchronizedInteresReader)
                 .processor(interesProcessor)
                 .writer(interesWriter)
@@ -87,8 +94,8 @@ public class MonthlyInterestJobConfig {
     @Bean
     public TaskExecutor monthlyInterestTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(3);
-        executor.setMaxPoolSize(3);
+        executor.setCorePoolSize(threadPoolSize);
+        executor.setMaxPoolSize(threadPoolSize);
         executor.setQueueCapacity(10);
         executor.setThreadNamePrefix("monthly-batch-");
         executor.initialize();

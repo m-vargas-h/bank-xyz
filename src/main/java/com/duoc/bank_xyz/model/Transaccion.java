@@ -11,7 +11,7 @@ public class Transaccion {
 
     private int id;
     private String fecha;
-    private double monto;
+    private Double monto;
     private String tipo;
     
 }

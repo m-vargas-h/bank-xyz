@@ -9,7 +9,7 @@ public class InteresProcessor implements ItemProcessor<Interes, Interes> {
 
     @Override
     public Interes process(Interes interes) throws Exception {
-        if (interes.getSaldo() <= 0) {
+        if (interes.getSaldo() == null || interes.getSaldo() <= 0) {
             System.out.println("Cuenta sin saldo, omitiendo cuenta_id: " + interes.getCuentaId());
             return null;
         }
@@ -32,4 +32,5 @@ public class InteresProcessor implements ItemProcessor<Interes, Interes> {
 
         return interes;
     }
+    
 }

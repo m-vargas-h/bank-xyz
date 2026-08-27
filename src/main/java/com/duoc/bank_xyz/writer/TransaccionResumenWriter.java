@@ -22,7 +22,7 @@ public class TransaccionResumenWriter implements ItemWriter<Transaccion> {
     @Override
     public void write(Chunk<? extends Transaccion> chunk) throws Exception {
         for (Transaccion t : chunk) {
-            if (t.getMonto() <= 0) {
+            if (t.getMonto() == null || t.getMonto() <= 0) {
                 totalAnomalias++;
             } else {
                 totalProcesadas++;
