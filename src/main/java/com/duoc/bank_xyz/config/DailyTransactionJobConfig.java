@@ -78,7 +78,7 @@ public class DailyTransactionJobConfig {
                 .taskExecutor(dailyTransactionTaskExecutor)
                 .faultTolerant()
                 .skipPolicy(bankSkipPolicy)
-                .retry(Exception.class)
+                .retry(org.springframework.dao.DataAccessException.class)
                 .retryLimit(3)
                 .backOffPolicy(new ExponentialBackOffPolicy())
                 .listener((SkipListener<Transaccion, Transaccion>) bankSkipListener)
@@ -88,11 +88,14 @@ public class DailyTransactionJobConfig {
     @Bean
     public Step dailyTransactionResumenStep(JobRepository jobRepository,
                                             PlatformTransactionManager transactionManager,
-                                            TransaccionResumenWriter transaccionResumenWriter) {
+                                            TransaccionResumenWriter transaccionResumenWriter,
+                                            BankSkipPolicy bankSkipPolicy) {
         return new StepBuilder("dailyTransactionResumenStep", jobRepository)
                 .<Transaccion, Transaccion>chunk(100, transactionManager)
                 .reader(transaccionReader())
                 .writer(transaccionResumenWriter)
+                .faultTolerant()
+                .skipPolicy(bankSkipPolicy)
                 .build();
     }
 

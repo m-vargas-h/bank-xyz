@@ -76,7 +76,7 @@ public class MonthlyInterestJobConfig {
                 .taskExecutor(monthlyInterestTaskExecutor)
                 .faultTolerant()
                 .skipPolicy(bankSkipPolicy)
-                .retry(Exception.class)
+                .retry(org.springframework.dao.DataAccessException.class)
                 .retryLimit(3)
                 .backOffPolicy(new ExponentialBackOffPolicy())
                 .listener((SkipListener<Interes, Interes>) bankSkipListener)

@@ -78,7 +78,7 @@ public class AnnualStatementJobConfig {
                 .taskExecutor(annualStatementTaskExecutor)
                 .faultTolerant()
                 .skipPolicy(bankSkipPolicy)
-                .retry(Exception.class)
+                .retry(org.springframework.dao.DataAccessException.class)
                 .retryLimit(3)
                 .backOffPolicy(new ExponentialBackOffPolicy())
                 .listener((SkipListener<CuentaAnual, CuentaAnual>) bankSkipListener)
@@ -87,12 +87,15 @@ public class AnnualStatementJobConfig {
 
     @Bean
     public Step annualStatementResumenStep(JobRepository jobRepository,
-                                        PlatformTransactionManager transactionManager,
-                                        CuentaAnualResumenWriter cuentaAnualResumenWriter) {
+                                            PlatformTransactionManager transactionManager,
+                                            CuentaAnualResumenWriter cuentaAnualResumenWriter,
+                                            BankSkipPolicy bankSkipPolicy) {
         return new StepBuilder("annualStatementResumenStep", jobRepository)
                 .<CuentaAnual, CuentaAnual>chunk(100, transactionManager)
                 .reader(cuentaAnualReader())
                 .writer(cuentaAnualResumenWriter)
+                .faultTolerant()
+                .skipPolicy(bankSkipPolicy)
                 .build();
     }
 

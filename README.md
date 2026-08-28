@@ -382,8 +382,8 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transactio
 
 | Corrida | Threads | Chunk size | Duración |
 |---|---|---|---|
-| 1 | 2 | 10 | 3m3s56ms |
-| 2 | 3 | 10 | 3m2s813ms |
-| 3 | 4 | 10 | 3m2s510ms |
+| 1 | 2 | 10 | 1s719ms |
+| 2 | 3 | 10 | 2s55ms |
+| 3 | 4 | 10 | 1s854ms |
 
 ---
