@@ -1,27 +1,31 @@
 package com.duoc.bank_xyz.policy;
 
+import com.duoc.bank_xyz.exception.InvalidBankDataException;
 import org.springframework.batch.core.step.skip.SkipLimitExceededException;
 import org.springframework.batch.core.step.skip.SkipPolicy;
+import org.springframework.batch.item.file.FlatFileParseException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 @Component
 public class BankSkipPolicy implements SkipPolicy {
 
-    private static final int SKIP_LIMIT = 10;
-
     @Override
     public boolean shouldSkip(Throwable t, long skipCount) throws SkipLimitExceededException {
-        if (skipCount >= SKIP_LIMIT) {
-            throw new SkipLimitExceededException(SKIP_LIMIT, t);
-        }
-        if (t instanceof IllegalArgumentException) {
-            System.out.println("[SkipPolicy] Registro omitido por dato inválido: " + t.getMessage()
-                    + " | omisiones acumuladas: " + (skipCount + 1));
+        if (t instanceof FlatFileParseException) {
+            System.out.println("[SkipPolicy] Error de lectura CSV, omitiendo registro: " + t.getMessage());
             return true;
         }
-        if (t instanceof org.springframework.dao.DataIntegrityViolationException) {
-            System.out.println("[SkipPolicy] Registro omitido por violación de integridad: " + t.getMessage()
-                    + " | omisiones acumuladas: " + (skipCount + 1));
+        if (t instanceof InvalidBankDataException) {
+            System.out.println("[SkipPolicy] Dato invalido, omitiendo registro: " + t.getMessage());
+            return true;
+        }
+        if (t instanceof IllegalArgumentException) {
+            System.out.println("[SkipPolicy] Argumento invalido, omitiendo registro: " + t.getMessage());
+            return true;
+        }
+        if (t instanceof DataIntegrityViolationException) {
+            System.out.println("[SkipPolicy] Error de integridad en BD, omitiendo registro: " + t.getMessage());
             return true;
         }
         return false;

@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -77,6 +78,7 @@ public class MonthlyInterestJobConfig {
                 .skipPolicy(bankSkipPolicy)
                 .retry(Exception.class)
                 .retryLimit(3)
+                .backOffPolicy(new ExponentialBackOffPolicy())
                 .listener((SkipListener<Interes, Interes>) bankSkipListener)
                 .build();
     }

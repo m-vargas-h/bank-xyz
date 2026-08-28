@@ -1,5 +1,6 @@
 package com.duoc.bank_xyz.processor;
 
+import com.duoc.bank_xyz.exception.InvalidBankDataException;
 import com.duoc.bank_xyz.model.Interes;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.stereotype.Component;
@@ -7,30 +8,33 @@ import org.springframework.stereotype.Component;
 @Component
 public class InteresProcessor implements ItemProcessor<Interes, Interes> {
 
+    private static final double TASA_AHORRO = 0.03;
+    private static final double TASA_PRESTAMO = 0.07;
+    private static final double TASA_HIPOTECA = 0.05;
+
     @Override
     public Interes process(Interes interes) throws Exception {
         if (interes.getSaldo() == null || interes.getSaldo() <= 0) {
-            System.out.println("Cuenta sin saldo, omitiendo cuenta_id: " + interes.getCuentaId());
-            return null;
+            throw new InvalidBankDataException("Cuenta sin saldo valido, cuenta_id: "
+                    + interes.getCuentaId() + " saldo: " + interes.getSaldo());
+        }
+        if (interes.getTipo() == null || interes.getTipo().equals("-1")
+                || interes.getTipo().equals("unknown")) {
+            throw new InvalidBankDataException("Tipo de cuenta invalido, cuenta_id: "
+                    + interes.getCuentaId() + " tipo: " + interes.getTipo());
         }
 
-        double tasa = switch (interes.getTipo().toLowerCase()) {
-            case "ahorro"   -> 0.03;
-            case "prestamo" -> 0.05;
-            case "hipoteca" -> 0.04;
-            default -> {
-                System.out.println("Tipo de cuenta desconocido, omitiendo cuenta_id: " + interes.getCuentaId());
-                yield -1;
-            }
+        double tasa = switch (interes.getTipo()) {
+            case "ahorro"   -> TASA_AHORRO;
+            case "prestamo" -> TASA_PRESTAMO;
+            case "hipoteca" -> TASA_HIPOTECA;
+            default -> throw new InvalidBankDataException("Tipo de cuenta no reconocido, cuenta_id: "
+                    + interes.getCuentaId() + " tipo: " + interes.getTipo());
         };
 
-        if (tasa < 0) return null;
-
         double interesCalculado = interes.getSaldo() * tasa;
-        interes.setSaldoFinal(interes.getSaldo() + interesCalculado);
         interes.setInteres(interesCalculado);
-
+        interes.setSaldoFinal(interes.getSaldo() + interesCalculado);
         return interes;
     }
-    
 }
