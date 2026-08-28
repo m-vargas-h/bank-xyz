@@ -136,23 +136,6 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transactio
 │       └── maven-wrapper.properties
 ├── docs
 │   └── images
-│       ├── evidencia_app.png
-│       ├── evidencia_app1.png
-│       ├── evidencia_docker.png
-│       ├── evidencia_job1_db.png
-│       ├── evidencia_job1_ejecucion.png
-│       ├── evidencia_job1_ejecucion1.png
-│       ├── evidencia_job2_db.png
-│       ├── evidencia_job2_ejecucion.png
-│       ├── evidencia_job2_ejecucion1.png
-│       ├── evidencia_job3_db.png
-│       ├── evidencia_job3_ejecucion.png
-│       ├── evidencia_job3_ejecucion1.png
-│       ├── evidencia_escalado_2hilos.png
-│       ├── evidencia_escalado_3hilos.png
-│       ├── evidencia_escalado_4hilos.png
-│       ├── evidencia_test.png
-│       └── evidencia_test1.png
 ├── src
 │   ├── main
 │   │   ├── java
@@ -190,7 +173,7 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transactio
 │   │       ├── static
 │   │       ├── templates
 │   │       ├── application.properties
-│   │parameter name="cuentas_anuales.csv
+│   │       ├── cuentas_anuales.csv
 │   │       ├── intereses.csv
 │   │       ├── schema.sql
 │   │       └── transacciones.csv
