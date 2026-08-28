@@ -1,12 +1,12 @@
 package com.duoc.bank_xyz.model;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
+@EqualsAndHashCode(of = {"cuentaId", "nombre", "saldo", "tipo"})
 public class Interes {
 
     private int cuentaId;

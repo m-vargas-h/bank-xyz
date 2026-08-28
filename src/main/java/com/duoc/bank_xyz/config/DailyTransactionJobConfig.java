@@ -55,8 +55,8 @@ public class DailyTransactionJobConfig {
     public JdbcBatchItemWriter<Transaccion> transaccionWriter(DataSource dataSource) {
         return new JdbcBatchItemWriterBuilder<Transaccion>()
                 .dataSource(dataSource)
-                .sql("INSERT INTO transaccion_reporte (id, fecha, monto, tipo, estado) " +
-                     "VALUES (:id, :fecha, :monto, :tipo, 'PROCESADO')")
+                .sql("INSERT INTO transaccion_reporte (transaccion_id, fecha, monto, tipo, estado) " +
+                    "VALUES (:id, :fecha, :monto, :tipo, 'PROCESADO')")
                 .beanMapped()
                 .build();
     }

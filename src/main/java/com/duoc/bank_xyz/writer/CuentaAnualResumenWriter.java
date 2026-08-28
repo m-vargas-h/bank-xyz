@@ -22,6 +22,7 @@ public class CuentaAnualResumenWriter implements ItemWriter<CuentaAnual> {
         Map<Integer, double[]> resumenPorCuenta = new HashMap<>();
 
         for (CuentaAnual c : chunk) {
+            if (c.getMonto() == null || c.getMonto() <= 0) continue;
             resumenPorCuenta.computeIfAbsent(c.getCuentaId(), k -> new double[]{0, 0});
             resumenPorCuenta.get(c.getCuentaId())[0]++;
             resumenPorCuenta.get(c.getCuentaId())[1] += c.getMonto();
