@@ -204,10 +204,23 @@ Excepción personalizada lanzada por los Processors cuando detectan un dato inv�
 |-----|------|--------|
 | `dailyTransactionReportJob` | Monto nulo, negativo o cero | Lanza `InvalidBankDataException` |
 | `dailyTransactionReportJob` | Tipo distinto de `credito`/`debito` | Lanza `InvalidBankDataException` |
+| `dailyTransactionReportJob` | Fecha nula, vacía o formato no reconocido | Lanza `InvalidBankDataException` |
 | `monthlyInterestJob` | Saldo nulo, negativo o cero | Lanza `InvalidBankDataException` |
 | `monthlyInterestJob` | Tipo de cuenta `-1` o `unknown` | Lanza `InvalidBankDataException` |
 | `annualStatementJob` | Monto nulo, negativo o cero | Lanza `InvalidBankDataException` |
 | `annualStatementJob` | Tipo de movimiento inválido | Lanza `InvalidBankDataException` |
+| `annualStatementJob` | Fecha nula, vacía o formato no reconocido | Lanza `InvalidBankDataException` |
+
+### Normalización de fechas
+
+El dataset oficial contiene fechas en cuatro formatos distintos. La clase utilitaria `DateParser` intenta parsear cada fecha contra los cuatro formatos en orden, normalizando el resultado a `dd-MM-yyyy`. Si ningún formato coincide (ej: mes 13), lanza `InvalidBankDataException` y el registro es omitido por la `BankSkipPolicy`.
+
+| Formato entrada | Ejemplo | Resultado normalizado |
+|---|---|---|
+| `dd-MM-yyyy` | `01-06-2024` | `01-06-2024` |
+| `dd/MM/yyyy` | `01/06/2024` | `01-06-2024` |
+| `yyyy-MM-dd` | `2024-06-01` | `01-06-2024` |
+| `yyyy/MM/dd` | `2024/06/01` | `01-06-2024` |
 
 ### BankSkipPolicy
 
@@ -222,10 +235,11 @@ Política de omisión personalizada que intercepta las siguientes excepciones y 
 
 ### RetryPolicy y BackOffPolicy
 
-Cada Step está configurado con una `RetryPolicy` que reintenta hasta 3 veces ante errores transitorios, combinada con una `ExponentialBackOffPolicy` con intervalo inicial de 100ms y multiplicador 2 (100ms → 200ms → 400ms entre reintentos), reduciendo la presión sobre recursos compartidos durante fallos temporales.
+Cada Step está configurado con una `RetryPolicy` acotada a `DataAccessException`, que reintenta hasta 3 veces ante errores transitorios de base de datos. Los errores permanentes de datos (`InvalidBankDataException`, `FlatFileParseException`) son manejados directamente por el skip sin generar reintentos innecesarios. La `ExponentialBackOffPolicy` aplica intervalos crecientes entre reintentos (100ms → 200ms → 400ms), reduciendo la presión sobre recursos compartidos.
 
 | Política | Configuración |
 |---|---|
+| Tipo de error reintentable | `DataAccessException` |
 | Reintentos máximos | 3 |
 | Intervalo inicial | 100ms |
 | Multiplicador | 2x (exponencial) |
@@ -239,7 +253,7 @@ Cada Step está configurado con una `RetryPolicy` que reintenta hasta 3 veces an
 
 ---
 
-## Escalado y optimización (Semana 3)
+## Escalado y optimización
 
 ### Procesamiento multi-thread configurable
 
