@@ -2,6 +2,7 @@ package com.duoc.bank_xyz.processor;
 
 import com.duoc.bank_xyz.exception.InvalidBankDataException;
 import com.duoc.bank_xyz.model.CuentaAnual;
+import com.duoc.bank_xyz.util.DateParser;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,9 @@ public class CuentaAnualProcessor implements ItemProcessor<CuentaAnual, CuentaAn
             throw new InvalidBankDataException("Tipo de transaccion invalido, cuenta_id: "
                     + cuentaAnual.getCuentaId() + " transaccion: " + cuentaAnual.getTransaccion());
         }
+        String fechaNormalizada = DateParser.normalize(cuentaAnual.getFecha(),
+                "cuenta_id=" + cuentaAnual.getCuentaId());
+        cuentaAnual.setFecha(fechaNormalizada);
         return cuentaAnual;
     }
 }

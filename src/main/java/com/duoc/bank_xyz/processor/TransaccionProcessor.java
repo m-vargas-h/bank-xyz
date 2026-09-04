@@ -2,6 +2,7 @@ package com.duoc.bank_xyz.processor;
 
 import com.duoc.bank_xyz.exception.InvalidBankDataException;
 import com.duoc.bank_xyz.model.Transaccion;
+import com.duoc.bank_xyz.util.DateParser;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,9 @@ public class TransaccionProcessor implements ItemProcessor<Transaccion, Transacc
             throw new InvalidBankDataException("Tipo de transaccion invalido, id: "
                     + transaccion.getId() + " tipo: " + transaccion.getTipo());
         }
+        String fechaNormalizada = DateParser.normalize(transaccion.getFecha(),
+                "transaccion id=" + transaccion.getId());
+        transaccion.setFecha(fechaNormalizada);
         return transaccion;
     }
 }
