@@ -1,0 +1,424 @@
+{
+  "info": {
+    "name": "bank-xyz Spring Batch",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "Ejecutar Jobs",
+          "item": [
+            {
+              "name": "Job 1 - Daily Transaction Report",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/jobs/daily-transaction?threads=4&chunkSize=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["jobs", "daily-transaction"],
+                  "query": [
+                    { "key": "threads", "value": "4" },
+                    { "key": "chunkSize", "value": "10" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Job 2 - Monthly Interest",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/jobs/monthly-interest?threads=4&chunkSize=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["jobs", "monthly-interest"],
+                  "query": [
+                    { "key": "threads", "value": "4" },
+                    { "key": "chunkSize", "value": "10" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Job 3 - Annual Statement",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/jobs/annual-statement?threads=4&chunkSize=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["jobs", "annual-statement"],
+                  "query": [
+                    { "key": "threads", "value": "4" },
+                    { "key": "chunkSize", "value": "10" }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Comparacion de Escalado - Daily Transaction",
+          "item": [
+            {
+              "name": "Corrida 1 - 2 hilos",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/jobs/daily-transaction?threads=2&chunkSize=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["jobs", "daily-transaction"],
+                  "query": [
+                    { "key": "threads", "value": "2" },
+                    { "key": "chunkSize", "value": "10" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Corrida 2 - 3 hilos",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/jobs/daily-transaction?threads=3&chunkSize=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["jobs", "daily-transaction"],
+                  "query": [
+                    { "key": "threads", "value": "3" },
+                    { "key": "chunkSize", "value": "10" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Corrida 3 - 4 hilos",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/jobs/daily-transaction?threads=4&chunkSize=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["jobs", "daily-transaction"],
+                  "query": [
+                    { "key": "threads", "value": "4" },
+                    { "key": "chunkSize", "value": "10" }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Web BFF",
+      "item": [
+        {
+          "name": "Transacciones",
+          "item": [
+            {
+              "name": "GET Todas las transacciones",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/transacciones",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "transacciones"]
+                }
+              }
+            },
+            {
+              "name": "GET Transacciones por tipo - credito",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/transacciones?tipo=credito",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "transacciones"],
+                  "query": [{ "key": "tipo", "value": "credito" }]
+                }
+              }
+            },
+            {
+              "name": "GET Transacciones por tipo - debito",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/transacciones?tipo=debito",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "transacciones"],
+                  "query": [{ "key": "tipo", "value": "debito" }]
+                }
+              }
+            },
+            {
+              "name": "GET Resumen transacciones",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/transacciones/resumen",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "transacciones", "resumen"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cuentas Anuales",
+          "item": [
+            {
+              "name": "GET Todas las cuentas anuales",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/cuentas",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "cuentas"]
+                }
+              }
+            },
+            {
+              "name": "GET Cuenta anual por ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/cuentas/1",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "cuentas", "1"]
+                }
+              }
+            },
+            {
+              "name": "GET Resumen cuentas anuales",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/cuentas/resumen",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "cuentas", "resumen"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Intereses",
+          "item": [
+            {
+              "name": "GET Todos los intereses",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/intereses",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "intereses"]
+                }
+              }
+            },
+            {
+              "name": "GET Intereses por tipo - ahorro",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/intereses?tipo=ahorro",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "intereses"],
+                  "query": [{ "key": "tipo", "value": "ahorro" }]
+                }
+              }
+            },
+            {
+              "name": "GET Intereses por tipo - prestamo",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/intereses?tipo=prestamo",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "intereses"],
+                  "query": [{ "key": "tipo", "value": "prestamo" }]
+                }
+              }
+            },
+            {
+              "name": "GET Intereses por tipo - hipoteca",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/intereses?tipo=hipoteca",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "intereses"],
+                  "query": [{ "key": "tipo", "value": "hipoteca" }]
+                }
+              }
+            },
+            {
+              "name": "GET Interes por cuenta ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/web/intereses/101",
+                  "host": ["{{base_url}}"],
+                  "path": ["web", "intereses", "101"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mobile BFF",
+      "item": [
+        {
+          "name": "Transacciones",
+          "item": [
+            {
+              "name": "GET Todas las transacciones",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/mobile/transacciones",
+                  "host": ["{{base_url}}"],
+                  "path": ["mobile", "transacciones"]
+                }
+              }
+            },
+            {
+              "name": "GET Transacciones por tipo - credito",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/mobile/transacciones?tipo=credito",
+                  "host": ["{{base_url}}"],
+                  "path": ["mobile", "transacciones"],
+                  "query": [{ "key": "tipo", "value": "credito" }]
+                }
+              }
+            },
+            {
+              "name": "GET Resumen transacciones",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/mobile/transacciones/resumen",
+                  "host": ["{{base_url}}"],
+                  "path": ["mobile", "transacciones", "resumen"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cuentas Anuales",
+          "item": [
+            {
+              "name": "GET Todas las cuentas anuales",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/mobile/cuentas",
+                  "host": ["{{base_url}}"],
+                  "path": ["mobile", "cuentas"]
+                }
+              }
+            },
+            {
+              "name": "GET Cuenta anual por ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/mobile/cuentas/1",
+                  "host": ["{{base_url}}"],
+                  "path": ["mobile", "cuentas", "1"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Intereses",
+          "item": [
+            {
+              "name": "GET Todos los intereses",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/mobile/intereses",
+                  "host": ["{{base_url}}"],
+                  "path": ["mobile", "intereses"]
+                }
+              }
+            },
+            {
+              "name": "GET Intereses por tipo - ahorro",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/mobile/intereses?tipo=ahorro",
+                  "host": ["{{base_url}}"],
+                  "path": ["mobile", "intereses"],
+                  "query": [{ "key": "tipo", "value": "ahorro" }]
+                }
+              }
+            },
+            {
+              "name": "GET Interes por cuenta ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/mobile/intereses/101",
+                  "host": ["{{base_url}}"],
+                  "path": ["mobile", "intereses", "101"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ATM BFF",
+      "item": [
+        {
+          "name": "GET Saldo por cuenta ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/atm/saldo/101",
+              "host": ["{{base_url}}"],
+              "path": ["atm", "saldo", "101"]
+            }
+          }
+        },
+        {
+          "name": "GET Transacciones por cuenta ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/atm/transacciones/1",
+              "host": ["{{base_url}}"],
+              "path": ["atm", "transacciones", "1"]
+            }
+          }
+        },
+        {
+          "name": "GET Resumen global",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/atm/resumen",
+              "host": ["{{base_url}}"],
+              "path": ["atm", "resumen"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

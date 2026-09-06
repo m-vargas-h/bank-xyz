@@ -8,7 +8,7 @@ Este proyecto implementa la migración de procesos batch del sistema legacy del 
 
 Spring Batch es un framework de procesamiento por lotes que permite ejecutar operaciones sobre grandes volúmenes de datos de forma estructurada, confiable y repetible. En este caso, se utiliza para procesar archivos CSV con datos bancarios y persistirlos en una base de datos MySQL, replicando la lógica de negocio que anteriormente ejecutaban los sistemas legacy.
 
-Cada proceso batch está implementado como un Job independiente, lo que permite ejecutarlos de forma aislada según la necesidad operacional del banco.
+Cada proceso batch está implementado como un Job independiente, lo que permite ejecutarlos de forma aislada según la necesidad operacional del banco. Los resultados son expuestos a través de tres canales BFF (Backend for Frontend): web, móvil y cajero automático.
 
 ---
 
@@ -27,11 +27,13 @@ El flujo de datos es el siguiente:
 CSV → ItemReader → ItemProcessor → ItemWriter → MySQL
                                        ↓
                                ResumenWriter → MySQL (tablas de resumen)
+                                       ↓
+                               BffDataService → BFF Controllers → Clientes
 ```
 
 Los Jobs de transacciones diarias y estados de cuenta anuales incorporan un segundo Step que consolida los datos procesados en tablas de resumen independientes.
 
-Los Jobs se lanzan de forma manual a través de endpoints REST expuestos por el `JobController`, lo que permite ejecutar cada proceso de forma independiente y controlada, con parámetros opcionales de configuración (`threads`, `chunkSize`).
+Los Jobs se lanzan a través de endpoints REST expuestos por el `JobController`. Los datos procesados son consultados por tres controladores BFF diferenciados según el canal de consumo.
 
 ---
 
@@ -39,12 +41,12 @@ Los Jobs se lanzan de forma manual a través de endpoints REST expuestos por el 
 
 ### dailyTransactionReportJob
 
-Procesa el archivo `transacciones.csv` en dos Steps encadenados. El Processor valida que el monto de cada transacción sea mayor a cero y que el tipo sea `credito` o `debito`, lanzando `InvalidBankDataException` para los registros que no cumplen. Las transacciones válidas se persisten en `transaccion_reporte`. Un segundo Step genera un resumen consolidado con el total de transacciones procesadas, monto total y cantidad de anomalías detectadas, persistido en `transaccion_resumen`.
+Procesa el archivo `transacciones.csv` en dos Steps encadenados. El Processor valida monto, tipo y fecha de cada transacción, lanzando `InvalidBankDataException` para los registros que no cumplen. Las transacciones válidas se persisten en `transaccion_reporte`. Un segundo Step genera un resumen consolidado en `transaccion_resumen`.
 
 | Componente | Clase | Descripción |
 |------------|-------|-------------|
 | Reader | `FlatFileItemReader` | Lee `transacciones.csv` |
-| Processor | `TransaccionProcessor` | Valida monto y tipo de transacción |
+| Processor | `TransaccionProcessor` | Valida monto, tipo y normaliza fecha |
 | Writer (Step 1) | `JdbcBatchItemWriter` | Inserta en `transaccion_reporte` |
 | Writer (Step 2) | `TransaccionResumenWriter` | Consolida resumen en `transaccion_resumen` |
 
@@ -52,7 +54,7 @@ Procesa el archivo `transacciones.csv` en dos Steps encadenados. El Processor va
 
 ### monthlyInterestJob
 
-Procesa el archivo `intereses.csv` que contiene las cuentas bancarias con sus saldos y tipos. El Processor aplica una tasa de interés según el tipo de cuenta (`ahorro` 3%, `prestamo` 7%, `hipoteca` 5%), calcula el interés generado y el saldo final. Las cuentas con saldo nulo, cero o negativo, y las de tipo desconocido (`-1`, `unknown`) son descartadas mediante `InvalidBankDataException`. Los resultados se persisten en la tabla `interes_reporte`.
+Procesa el archivo `intereses.csv` que contiene las cuentas bancarias con sus saldos y tipos. El Processor aplica una tasa de interés según el tipo de cuenta (`ahorro` 3%, `prestamo` 7%, `hipoteca` 5%), calcula el interés generado y el saldo final. Las cuentas con saldo nulo, cero o negativo, y las de tipo desconocido (`-1`, `unknown`) son descartadas. Los resultados se persisten en `interes_reporte`.
 
 | Componente | Clase | Descripción |
 |------------|-------|-------------|
@@ -64,14 +66,57 @@ Procesa el archivo `intereses.csv` que contiene las cuentas bancarias con sus sa
 
 ### annualStatementJob
 
-Procesa el archivo `cuentas_anuales.csv` en dos Steps encadenados. El Processor descarta movimientos con monto nulo, cero o negativo, y aquellos con tipo de transacción inválido (distinto de `deposito`, `retiro`, `compra` o `pago`). Los movimientos válidos se persisten en `cuenta_anual_reporte`. Un segundo Step consolida los movimientos por `cuenta_id` en `cuenta_anual_resumen` para uso en auditorías.
+Procesa el archivo `cuentas_anuales.csv` en dos Steps encadenados. El Processor valida monto, tipo de movimiento y fecha, descartando registros inválidos. Los movimientos válidos se persisten en `cuenta_anual_reporte`. Un segundo Step consolida los movimientos por `cuenta_id` en `cuenta_anual_resumen`.
 
 | Componente | Clase | Descripción |
 |------------|-------|-------------|
 | Reader | `FlatFileItemReader` | Lee `cuentas_anuales.csv` |
-| Processor | `CuentaAnualProcessor` | Valida monto y tipo de movimiento |
+| Processor | `CuentaAnualProcessor` | Valida monto, tipo y normaliza fecha |
 | Writer (Step 1) | `JdbcBatchItemWriter` | Inserta en `cuenta_anual_reporte` |
 | Writer (Step 2) | `CuentaAnualResumenWriter` | Consolida resumen en `cuenta_anual_resumen` |
+
+---
+
+## BFF — Backend for Frontend
+
+El proyecto expone tres controladores BFF diferenciados según el canal de consumo. Cada uno retorna únicamente los campos relevantes para su canal, consumiendo los datos desde `BffDataService`.
+
+### Web BFF (`/web/**`)
+
+Canal completo con acceso a todos los datos y campos disponibles.
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/web/transacciones` | GET | Todas las transacciones (filtrable por `?tipo=`) |
+| `/web/transacciones/resumen` | GET | Resumen consolidado de transacciones |
+| `/web/cuentas` | GET | Todos los movimientos anuales |
+| `/web/cuentas/{id}` | GET | Movimientos de una cuenta específica |
+| `/web/cuentas/resumen` | GET | Resumen consolidado por cuenta |
+| `/web/intereses` | GET | Todos los intereses (filtrable por `?tipo=`) |
+| `/web/intereses/{cuentaId}` | GET | Intereses de una cuenta específica |
+
+### Mobile BFF (`/mobile/**`)
+
+Canal móvil con campos reducidos para optimizar el ancho de banda.
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/mobile/transacciones` | GET | Transacciones con campos `monto`, `tipo`, `estado` |
+| `/mobile/transacciones/resumen` | GET | Resumen con `monto_total` y `total_anomalias` |
+| `/mobile/cuentas` | GET | Movimientos con campos `cuenta_id`, `monto`, `transaccion` |
+| `/mobile/cuentas/{id}` | GET | Movimientos de una cuenta específica |
+| `/mobile/intereses` | GET | Intereses con campos `cuenta_id`, `saldo`, `tipo` |
+| `/mobile/intereses/{cuentaId}` | GET | Intereses de una cuenta específica |
+
+### ATM BFF (`/atm/**`)
+
+Canal cajero con acceso mínimo enfocado en operaciones de saldo y movimientos.
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/atm/saldo/{cuentaId}` | GET | Saldo e interés de la cuenta (`cuenta_id`, `saldo`, `tipo`) |
+| `/atm/transacciones/{cuentaId}` | GET | Movimientos de la cuenta (`cuenta_id`, `monto`, `transaccion`) |
+| `/atm/resumen` | GET | Resumen global (`total_procesadas`, `total_anomalias`) |
 
 ---
 
@@ -80,6 +125,7 @@ Procesa el archivo `cuentas_anuales.csv` en dos Steps encadenados. El Processor 
 - Java 21
 - Spring Boot 3.3.5
 - Spring Batch 5.1.2
+- Spring Security
 - MySQL 8.0
 - Docker / Docker Compose
 - Lombok
@@ -89,6 +135,9 @@ Procesa el archivo `cuentas_anuales.csv` en dos Steps encadenados. El Processor 
 - Java 21
 - Maven
 - Docker Desktop
+- Postman (para ejecutar la colección de pruebas)
+
+---
 
 ## Configuración y ejecución
 
@@ -110,31 +159,30 @@ docker-compose up -d
 ./mvnw spring-boot:run
 ```
 
-### 4. Ejecutar los jobs
+### 4. Importar la colección Postman
 
-Los Jobs aceptan parámetros opcionales `threads` y `chunkSize` para controlar el nivel de paralelismo. Si no se especifican, se usan los valores definidos en `application.properties`.
+Importar el archivo `bank-xyz.postman_collection.json` incluido en la raíz del repositorio. La colección incluye una variable `base_url` configurada en `http://localhost:8080`.
 
-```bash
-# Job 1 - Reporte de transacciones diarias
-Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transaction"
+### 5. Ejecutar los Jobs
 
-# Job 2 - Cálculo de intereses mensuales
-Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/monthly-interest"
+Los Jobs aceptan parámetros opcionales `threads` y `chunkSize`. Si no se especifican, se usan los valores definidos en `application.properties`.
 
-# Job 3 - Estado de cuentas anuales
-Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/annual-statement"
-
-# Con parámetros personalizados
-Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transaction?threads=4&chunkSize=10"
+```properties
+batch.thread-pool-size=3
+batch.chunk-size=10
 ```
 
+---
+
 ## Estructura del proyecto
+
 
 ```
 ├── .mvn
 │   └── wrapper
 │       └── maven-wrapper.properties
 ├── docs
+│   ├── Postman
 │   └── images
 ├── src
 │   ├── main
@@ -145,9 +193,13 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transactio
 │   │   │               ├── config
 │   │   │               │   ├── AnnualStatementJobConfig.java
 │   │   │               │   ├── DailyTransactionJobConfig.java
-│   │   │               │   └── MonthlyInterestJobConfig.java
+│   │   │               │   ├── MonthlyInterestJobConfig.java
+│   │   │               │   └── SecurityConfig.java
 │   │   │               ├── controller
-│   │   │               │   └── JobController.java
+│   │   │               │   ├── AtmBffController.java
+│   │   │               │   ├── JobController.java
+│   │   │               │   ├── MobileBffController.java
+│   │   │               │   └── WebBffController.java
 │   │   │               ├── exception
 │   │   │               │   └── InvalidBankDataException.java
 │   │   │               ├── listener
@@ -165,6 +217,10 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transactio
 │   │   │               │   ├── CuentaAnualProcessor.java
 │   │   │               │   ├── InteresProcessor.java
 │   │   │               │   └── TransaccionProcessor.java
+│   │   │               ├── service
+│   │   │               │   └── BffDataService.java
+│   │   │               ├── util
+│   │   │               │   └── DateParser.java
 │   │   │               ├── writer
 │   │   │               │   ├── CuentaAnualResumenWriter.java
 │   │   │               │   └── TransaccionResumenWriter.java
@@ -235,7 +291,7 @@ Política de omisión personalizada que intercepta las siguientes excepciones y 
 
 ### RetryPolicy y BackOffPolicy
 
-Cada Step está configurado con una `RetryPolicy` acotada a `DataAccessException`, que reintenta hasta 3 veces ante errores transitorios de base de datos. Los errores permanentes de datos (`InvalidBankDataException`, `FlatFileParseException`) son manejados directamente por el skip sin generar reintentos innecesarios. La `ExponentialBackOffPolicy` aplica intervalos crecientes entre reintentos (100ms → 200ms → 400ms), reduciendo la presión sobre recursos compartidos.
+Cada Step está configurado con una `RetryPolicy` acotada a `DataAccessException`, que reintenta hasta 3 veces ante errores transitorios de base de datos. Los errores permanentes de datos (`InvalidBankDataException`, `FlatFileParseException`) son manejados directamente por el skip sin generar reintentos innecesarios. La `ExponentialBackOffPolicy` aplica intervalos crecientes entre reintentos (100ms → 200ms → 400ms).
 
 | Política | Configuración |
 |---|---|
@@ -257,7 +313,7 @@ Cada Step está configurado con una `RetryPolicy` acotada a `DataAccessException
 
 ### Procesamiento multi-thread configurable
 
-Cada Job cuenta con un `ThreadPoolTaskExecutor` configurable mediante parámetros HTTP (`threads`, `chunkSize`), permitiendo ajustar el nivel de paralelismo en tiempo de ejecución sin necesidad de recompilar. Los valores por defecto se definen en `application.properties`.
+Cada Job cuenta con un `ThreadPoolTaskExecutor` configurable mediante parámetros HTTP (`threads`, `chunkSize`), permitiendo ajustar el nivel de paralelismo en tiempo de ejecución sin necesidad de recompilar.
 
 ```properties
 batch.thread-pool-size=3
@@ -270,9 +326,7 @@ Para garantizar thread-safety en la lectura concurrente, el `FlatFileItemReader`
 
 ## Tests
 
-El proyecto incluye un test de contexto (`contextLoads`) que verifica que la aplicación levanta correctamente con todos sus beans y configuraciones.
-
-Para evitar dependencia de una base de datos MySQL en ejecución durante los tests, se utiliza H2 como base de datos en memoria. Esto se logra mediante `@TestPropertySource` que sobreescribe las propiedades de conexión definidas en `application.properties` únicamente durante la ejecución de los tests, sin modificar la configuración de producción.
+El proyecto incluye un test de contexto (`contextLoads`) que verifica que la aplicación levanta correctamente con todos sus beans y configuraciones. Para evitar dependencia de MySQL durante los tests, se utiliza H2 como base de datos en memoria mediante `@TestPropertySource`.
 
 ```bash
 ./mvnw clean test
@@ -284,6 +338,8 @@ Para evitar dependencia de una base de datos MySQL en ejecución durante los tes
 ---
 
 ## Evidencia de ejecución
+
+Las evidencias se realizan a través de la colección Postman `bank-xyz.postman_collection.json` incluida en el repositorio.
 
 ### 1. Levantar base de datos
 
@@ -308,96 +364,57 @@ docker-compose up -d
 
 ### 3. Job 1 - Reporte de transacciones diarias
 
-```bash
-Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transaction?threads=4&chunkSize=10"
-```
+Carpeta **Jobs → Ejecutar Jobs → Job 1 - Daily Transaction Report**
 
-![Job 1 ejecución](docs/images/evidencia_job1_ejecucion.png)
+![Job 1 ejecución Postman](docs/images/evidencia_job1_ejecucion.png)
 ![Job 1 consola](docs/images/evidencia_job1_ejecucion1.png)
 
-```bash
-docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM transaccion_reporte LIMIT 20;"
-docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM transaccion_resumen;"
-```
+Verificación con **Web BFF → Transacciones → GET Todas las transacciones** y **GET Resumen transacciones**
 
-![Job 1 base de datos](docs/images/evidencia_job1_db.png)
-![Job 1 base de datos](docs/images/evidencia_job1_db1.png)
+![Job 1 transacciones](docs/images/evidencia_job1_web_transacciones.png)
+![Job 1 resumen](docs/images/evidencia_job1_web_resumen.png)
 
 ---
 
 ### 4. Job 2 - Cálculo de intereses mensuales
 
-```bash
-Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/monthly-interest?threads=4&chunkSize=10"
-```
+Carpeta **Jobs → Ejecutar Jobs → Job 2 - Monthly Interest**
 
-![Job 2 ejecución](docs/images/evidencia_job2_ejecucion.png)
+![Job 2 ejecución Postman](docs/images/evidencia_job2_ejecucion.png)
 ![Job 2 consola](docs/images/evidencia_job2_ejecucion1.png)
 
-```bash
-docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM interes_reporte LIMIT 20;"
-```
+Verificación con **Web BFF → Intereses → GET Todos los intereses**
 
-![Job 2 base de datos](docs/images/evidencia_job2_db.png)
+![Job 2 intereses](docs/images/evidencia_job2_web_intereses.png)
 
 ---
 
 ### 5. Job 3 - Estado de cuentas anuales
 
-```bash
-Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/annual-statement?threads=4&chunkSize=10"
-```
+Carpeta **Jobs → Ejecutar Jobs → Job 3 - Annual Statement**
 
-![Job 3 ejecución](docs/images/evidencia_job3_ejecucion.png)
+![Job 3 ejecución Postman](docs/images/evidencia_job3_ejecucion.png)
 ![Job 3 consola](docs/images/evidencia_job3_ejecucion1.png)
 
-```bash
-docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM cuenta_anual_reporte LIMIT 20;"
-docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "SELECT * FROM cuenta_anual_resumen;"
-```
+Verificación con **Web BFF → Cuentas Anuales → GET Todas las cuentas anuales** y **GET Resumen cuentas anuales**
 
-![Job 3 base de datos](docs/images/evidencia_job3_db.png)
-![Job 3 base de datos](docs/images/evidencia_job3_db1.png)
+![Job 3 cuentas](docs/images/evidencia_job3_web_cuentas.png)
+![Job 3 resumen](docs/images/evidencia_job3_web_resumen.png)
 
 ---
 
-### 6. Comparación de rendimiento — escalado multi-thread
+### 6. Verificación por canal BFF
 
-Se ejecutó el `dailyTransactionReportJob` tres veces variando el número de hilos, limpiando las tablas entre cada corrida, con el fin de identificar la configuración óptima.
+**Mobile BFF** — datos reducidos por canal móvil
 
-**Corrida 1 — 2 hilos**
+![Mobile transacciones](docs/images/evidencia_mobile_transacciones.png)
+![Mobile intereses](docs/images/evidencia_mobile_intereses.png)
+![Mobile cuentas](docs/images/evidencia_mobile_cuentas.png)
 
-```bash
-docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "TRUNCATE TABLE transaccion_reporte; TRUNCATE TABLE transaccion_resumen;"
-Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transaction?threads=2&chunkSize=10"
-```
+**ATM BFF** — acceso mínimo para cajero
 
-![Escalado 2 hilos](docs/images/evidencia_escalado_2hilos.png)
-
-**Corrida 2 — 3 hilos**
-
-```bash
-docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "TRUNCATE TABLE transaccion_reporte; TRUNCATE TABLE transaccion_resumen;"
-Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transaction?threads=3&chunkSize=10"
-```
-
-![Escalado 3 hilos](docs/images/evidencia_escalado_3hilos.png)
-
-**Corrida 3 — 4 hilos**
-
-```bash
-docker exec -it bank-xyz-mysql mysql -uroot -proot bank_xyz -e "TRUNCATE TABLE transaccion_reporte; TRUNCATE TABLE transaccion_resumen;"
-Invoke-RestMethod -Method POST -Uri "http://localhost:8080/jobs/daily-transaction?threads=4&chunkSize=10"
-```
-
-![Escalado 4 hilos](docs/images/evidencia_escalado_4hilos.png)
-
-**Resultados**
-
-| Corrida | Threads | Chunk size | Duración |
-|---|---|---|---|
-| 1 | 2 | 10 | 1s719ms |
-| 2 | 3 | 10 | 2s55ms |
-| 3 | 4 | 10 | 1s854ms |
+![ATM saldo](docs/images/evidencia_atm_saldo.png)
+![ATM transacciones](docs/images/evidencia_atm_transacciones.png)
+![ATM resumen](docs/images/evidencia_atm_resumen.png)
 
 ---
