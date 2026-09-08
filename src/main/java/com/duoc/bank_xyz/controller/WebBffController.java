@@ -1,6 +1,9 @@
 package com.duoc.bank_xyz.controller;
 
+import com.duoc.bank_xyz.dto.ApiResponse;
+import com.duoc.bank_xyz.exception.ResourceNotFoundException;
 import com.duoc.bank_xyz.service.BffDataService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,47 +21,55 @@ public class WebBffController {
 
     // --- Transacciones ---
     @GetMapping("/transacciones")
-    public List<Map<String, Object>> getTransacciones(
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getTransacciones(
             @RequestParam(required = false) String tipo) {
-        if (tipo != null && !tipo.isBlank()) {
-            return dataService.getTransaccionesByTipo(tipo);
-        }
-        return dataService.getTransacciones();
+        List<Map<String, Object>> data = (tipo != null && !tipo.isBlank())
+                ? dataService.getTransaccionesByTipo(tipo)
+                : dataService.getTransacciones();
+        if (data.isEmpty()) throw new ResourceNotFoundException("Sin transacciones");
+        return ResponseEntity.ok(new ApiResponse<>("web", data));
     }
 
     @GetMapping("/transacciones/resumen")
-    public Map<String, Object> getResumenTransacciones() {
-        return dataService.getResumenTransacciones();
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getResumenTransacciones() {
+        return ResponseEntity.ok(new ApiResponse<>("web", dataService.getResumenTransacciones()));
     }
 
     // --- Cuentas anuales ---
     @GetMapping("/cuentas")
-    public List<Map<String, Object>> getCuentasAnuales() {
-        return dataService.getCuentasAnuales();
-    }
-
-    @GetMapping("/cuentas/{id}")
-    public List<Map<String, Object>> getCuentaById(@PathVariable int id) {
-        return dataService.getCuentaAnualById(id);
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getCuentasAnuales() {
+        List<Map<String, Object>> data = dataService.getCuentasAnuales();
+        if (data.isEmpty()) throw new ResourceNotFoundException("Sin cuentas anuales");
+        return ResponseEntity.ok(new ApiResponse<>("web", data));
     }
 
     @GetMapping("/cuentas/resumen")
-    public List<Map<String, Object>> getResumenCuentas() {
-        return dataService.getResumenCuentas();
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getResumenCuentas() {
+        return ResponseEntity.ok(new ApiResponse<>("web", dataService.getResumenCuentas()));
+    }
+
+    @GetMapping("/cuentas/{id}")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getCuentaById(@PathVariable int id) {
+        List<Map<String, Object>> data = dataService.getCuentaAnualById(id);
+        if (data.isEmpty()) throw new ResourceNotFoundException("Cuenta no encontrada: " + id);
+        return ResponseEntity.ok(new ApiResponse<>("web", data));
     }
 
     // --- Intereses ---
     @GetMapping("/intereses")
-    public List<Map<String, Object>> getIntereses(
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getIntereses(
             @RequestParam(required = false) String tipo) {
-        if (tipo != null && !tipo.isBlank()) {
-            return dataService.getInteresesByTipo(tipo);
-        }
-        return dataService.getIntereses();
+        List<Map<String, Object>> data = (tipo != null && !tipo.isBlank())
+                ? dataService.getInteresesByTipo(tipo)
+                : dataService.getIntereses();
+        if (data.isEmpty()) throw new ResourceNotFoundException("Sin intereses");
+        return ResponseEntity.ok(new ApiResponse<>("web", data));
     }
 
     @GetMapping("/intereses/{cuentaId}")
-    public List<Map<String, Object>> getInteresByCuenta(@PathVariable int cuentaId) {
-        return dataService.getInteresByCuenta(cuentaId);
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getInteresByCuenta(@PathVariable int cuentaId) {
+        List<Map<String, Object>> data = dataService.getInteresByCuenta(cuentaId);
+        if (data.isEmpty()) throw new ResourceNotFoundException("Sin intereses para cuenta: " + cuentaId);
+        return ResponseEntity.ok(new ApiResponse<>("web", data));
     }
 }
