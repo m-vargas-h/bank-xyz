@@ -35,3 +35,5 @@ build/
 # Carpeta de material educativo
 /material/
 
+# Keystore autofirmado (generar localmente con keytool)
+src/main/resources/keystore.p12

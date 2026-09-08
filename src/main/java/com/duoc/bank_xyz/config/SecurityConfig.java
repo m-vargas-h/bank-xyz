@@ -58,6 +58,9 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
+            .requiresChannel(channel -> channel
+                .anyRequest().requiresSecure()
+            )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/web/**").hasRole("WEB")
                 .requestMatchers("/mobile/**").hasRole("MOBILE")
@@ -68,4 +71,5 @@ public class SecurityConfig {
             .httpBasic(basic -> {});
         return http.build();
     }
+
 }
