@@ -16,6 +16,9 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    @Value("${server.ssl.enabled:true}")
+    private boolean sslEnabled;
+
     @Value("${bff.security.web.user}")
     private String webUser;
     @Value("${bff.security.web.password}")
@@ -57,10 +60,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable())
-            .requiresChannel(channel -> channel
-                .anyRequest().requiresSecure()
-            )
+            .csrf(csrf -> csrf.disable());
+
+        if (sslEnabled) {
+            http.requiresChannel(channel -> channel.anyRequest().requiresSecure());
+        }
+
+        http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/web/**").hasRole("WEB")
                 .requestMatchers("/mobile/**").hasRole("MOBILE")
@@ -69,6 +75,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .httpBasic(basic -> {});
+
         return http.build();
     }
 
