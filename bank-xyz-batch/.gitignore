@@ -31,9 +31,3 @@ build/
 
 ### VS Code ###
 .vscode/
-
-# Carpeta de material educativo
-/material/
-
-# Keystore autofirmado (generar localmente con keytool)
-**/keystore.p12

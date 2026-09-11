@@ -1,0 +1,17 @@
+package com.duoc.bank_xyz_batch.model;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Transaccion {
+
+    private int id;
+    private String fecha;
+    private Double monto;
+    private String tipo;
+    
+}
