@@ -1,6 +1,7 @@
 package com.duoc.bank_xyz_bff.controller;
 
 import com.duoc.bank_xyz_bff.config.SecurityConfig;
+import com.duoc.bank_xyz_bff.dto.interes.InteresDto;
 import com.duoc.bank_xyz_bff.service.BffDataService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,8 +12,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,9 +41,12 @@ class AtmBffControllerTest {
     @Test
     @WithMockUser(roles = "ATM")
     void getSaldo_conRolAtm_retornaOk() throws Exception {
-        when(dataService.getInteresByCuenta(1)).thenReturn(List.of(
-                Map.of("cuenta_id", 1, "saldo", 8000, "tipo", "corriente")
-        ));
+        InteresDto i = new InteresDto();
+        i.setCuentaId(1L);
+        i.setSaldo(new BigDecimal("8000"));
+        i.setTipo("corriente");
+
+        when(dataService.getInteresByCuenta(1)).thenReturn(List.of(i));
 
         mockMvc.perform(get("/atm/saldo/1"))
                 .andExpect(status().isOk())

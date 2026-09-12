@@ -1,6 +1,8 @@
 package com.duoc.bank_xyz_bff.controller;
 
 import com.duoc.bank_xyz_bff.config.SecurityConfig;
+import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualDto;
+import com.duoc.bank_xyz_bff.dto.transaccion.TransaccionDto;
 import com.duoc.bank_xyz_bff.service.BffDataService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,8 +13,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,9 +42,12 @@ class WebBffControllerTest {
     @Test
     @WithMockUser(roles = "WEB")
     void getTransacciones_conRolWeb_retornaOk() throws Exception {
-        when(dataService.getTransacciones()).thenReturn(List.of(
-                Map.of("monto", 1000, "tipo", "debito", "estado", "procesado")
-        ));
+        TransaccionDto t = new TransaccionDto();
+        t.setMonto(new BigDecimal("1000"));
+        t.setTipo("debito");
+        t.setEstado("procesado");
+
+        when(dataService.getTransacciones()).thenReturn(List.of(t));
 
         mockMvc.perform(get("/web/transacciones"))
                 .andExpect(status().isOk())

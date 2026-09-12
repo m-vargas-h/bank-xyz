@@ -1,6 +1,8 @@
 package com.duoc.bank_xyz_bff.controller;
 
 import com.duoc.bank_xyz_bff.config.SecurityConfig;
+import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualDto;
+import com.duoc.bank_xyz_bff.dto.interes.InteresDto;
 import com.duoc.bank_xyz_bff.service.BffDataService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,8 +13,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,15 +42,18 @@ class MobileBffControllerTest {
     @Test
     @WithMockUser(roles = "MOBILE")
     void getIntereses_conRolMobile_retornaOk() throws Exception {
-        when(dataService.getIntereses()).thenReturn(List.of(
-                Map.of("cuenta_id", 1, "saldo", 5000, "tipo", "ahorro", "extra", "ignorado")
-        ));
+        InteresDto i = new InteresDto();
+        i.setCuentaId(1L);
+        i.setSaldo(new BigDecimal("5000"));
+        i.setTipo("ahorro");
+
+        when(dataService.getIntereses()).thenReturn(List.of(i));
 
         mockMvc.perform(get("/mobile/intereses"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.canal").value("mobile"))
                 .andExpect(jsonPath("$.estado").value("ok"))
-                .andExpect(jsonPath("$.datos[0].cuenta_id").value(1))
+                .andExpect(jsonPath("$.datos[0].cuentaId").value(1))
                 .andExpect(jsonPath("$.datos[0].saldo").value(5000));
     }
 

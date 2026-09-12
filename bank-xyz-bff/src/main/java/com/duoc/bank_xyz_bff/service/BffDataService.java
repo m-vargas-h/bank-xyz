@@ -1,10 +1,15 @@
 package com.duoc.bank_xyz_bff.service;
 
+import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualDto;
+import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualResumenDto;
+import com.duoc.bank_xyz_bff.dto.interes.InteresDto;
+import com.duoc.bank_xyz_bff.dto.transaccion.TransaccionDto;
+import com.duoc.bank_xyz_bff.dto.transaccion.TransaccionResumenDto;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class BffDataService {
@@ -16,49 +21,54 @@ public class BffDataService {
     }
 
     // --- Transacciones ---
-    public List<Map<String, Object>> getTransacciones() {
-        return jdbc.queryForList("SELECT * FROM transaccion_reporte");
+    public List<TransaccionDto> getTransacciones() {
+        return jdbc.query("SELECT * FROM transaccion_reporte",
+                new BeanPropertyRowMapper<>(TransaccionDto.class));
     }
 
-    public List<Map<String, Object>> getTransaccionesByTipo(String tipo) {
-        return jdbc.queryForList(
-            "SELECT * FROM transaccion_reporte WHERE tipo = ?", tipo);
+    public List<TransaccionDto> getTransaccionesByTipo(String tipo) {
+        return jdbc.query("SELECT * FROM transaccion_reporte WHERE tipo = ?",
+                new BeanPropertyRowMapper<>(TransaccionDto.class), tipo);
     }
 
-    public Map<String, Object> getResumenTransacciones() {
-        return jdbc.queryForMap(
-            "SELECT SUM(total_procesadas) AS total_procesadas, " +
-            "SUM(monto_total) AS monto_total, " +
-            "SUM(total_anomalias) AS total_anomalias " +
-            "FROM transaccion_resumen");
+    public TransaccionResumenDto getResumenTransacciones() {
+        return jdbc.queryForObject(
+                "SELECT SUM(total_procesadas) AS totalProcesadas, " +
+                "SUM(monto_total) AS montoTotal, " +
+                "SUM(total_anomalias) AS totalAnomalias " +
+                "FROM transaccion_resumen",
+                new BeanPropertyRowMapper<>(TransaccionResumenDto.class));
     }
 
     // --- Cuentas anuales ---
-    public List<Map<String, Object>> getCuentasAnuales() {
-        return jdbc.queryForList("SELECT * FROM cuenta_anual_reporte");
+    public List<CuentaAnualDto> getCuentasAnuales() {
+        return jdbc.query("SELECT * FROM cuenta_anual_reporte",
+                new BeanPropertyRowMapper<>(CuentaAnualDto.class));
     }
 
-    public List<Map<String, Object>> getCuentaAnualById(int cuentaId) {
-        return jdbc.queryForList(
-            "SELECT * FROM cuenta_anual_reporte WHERE cuenta_id = ?", cuentaId);
+    public List<CuentaAnualDto> getCuentaAnualById(int cuentaId) {
+        return jdbc.query("SELECT * FROM cuenta_anual_reporte WHERE cuenta_id = ?",
+                new BeanPropertyRowMapper<>(CuentaAnualDto.class), cuentaId);
     }
 
-    public List<Map<String, Object>> getResumenCuentas() {
-        return jdbc.queryForList("SELECT * FROM cuenta_anual_resumen");
+    public List<CuentaAnualResumenDto> getResumenCuentas() {
+        return jdbc.query("SELECT * FROM cuenta_anual_resumen",
+                new BeanPropertyRowMapper<>(CuentaAnualResumenDto.class));
     }
 
     // --- Intereses ---
-    public List<Map<String, Object>> getIntereses() {
-        return jdbc.queryForList("SELECT * FROM interes_reporte");
+    public List<InteresDto> getIntereses() {
+        return jdbc.query("SELECT * FROM interes_reporte",
+                new BeanPropertyRowMapper<>(InteresDto.class));
     }
 
-    public List<Map<String, Object>> getInteresesByTipo(String tipo) {
-        return jdbc.queryForList(
-            "SELECT * FROM interes_reporte WHERE tipo = ?", tipo);
+    public List<InteresDto> getInteresesByTipo(String tipo) {
+        return jdbc.query("SELECT * FROM interes_reporte WHERE tipo = ?",
+                new BeanPropertyRowMapper<>(InteresDto.class), tipo);
     }
 
-    public List<Map<String, Object>> getInteresByCuenta(int cuentaId) {
-        return jdbc.queryForList(
-            "SELECT * FROM interes_reporte WHERE cuenta_id = ?", cuentaId);
+    public List<InteresDto> getInteresByCuenta(int cuentaId) {
+        return jdbc.query("SELECT * FROM interes_reporte WHERE cuenta_id = ?",
+                new BeanPropertyRowMapper<>(InteresDto.class), cuentaId);
     }
 }
