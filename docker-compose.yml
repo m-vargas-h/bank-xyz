@@ -38,6 +38,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bank_xyz?serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
+      SERVER_SSL_KEY_STORE: classpath:keystore.p12
+      SERVER_SSL_KEY_STORE_PASSWORD: bankxyz2024
+      SERVER_SSL_KEY_STORE_TYPE: PKCS12
+      SERVER_SSL_KEY_ALIAS: bank-xyz-bff
     depends_on:
       mysql:
         condition: service_healthy
