@@ -229,10 +229,12 @@ Los servicios quedan disponibles en:
 docker-compose up mysql -d
 
 # 2. Ejecutar batch (en una terminal)
-cd bank-xyz-batch && ./mvnw spring-boot:run
+cd bank-xyz-batch
+./mvnw spring-boot:run
 
 # 3. Ejecutar BFF (en otra terminal)
-cd bank-xyz-bff && ./mvnw spring-boot:run
+cd bank-xyz-bff
+./mvnw spring-boot:run
 ```
 
 ---
@@ -389,10 +391,12 @@ Los tests de integración del BFF usan `@WebMvcTest` con `@WithMockUser` y `@Imp
 
 ```bash
 # Batch
-cd bank-xyz-batch && ./mvnw test
+cd bank-xyz-batch
+./mvnw test
 
 # BFF
-cd bank-xyz-bff && ./mvnw test
+cd bank-xyz-bff
+./mvnw test
 ```
 
 | Test | Canal | Verifica |
