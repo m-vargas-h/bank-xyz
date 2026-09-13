@@ -1,122 +1,163 @@
-# Bank XYZ - Spring Batch
+# Bank XYZ - Spring Batch + BFF
 
-Migración de procesos legacy del Banco XYZ utilizando Spring Batch.
+Migración de procesos legacy del Banco XYZ utilizando Spring Batch, con exposición de datos a través del patrón Backend for Frontend (BFF).
 
 ## Descripción
 
-Este proyecto implementa la migración de procesos batch del sistema legacy del Banco XYZ, reemplazando scripts COBOL/Shell por soluciones Java modernas utilizando Spring Batch.
+Este proyecto implementa la migración de procesos batch del sistema legacy del Banco XYZ. El sistema está compuesto por dos aplicaciones independientes que comparten una base de datos MySQL:
 
-Spring Batch es un framework de procesamiento por lotes que permite ejecutar operaciones sobre grandes volúmenes de datos de forma estructurada, confiable y repetible. En este caso, se utiliza para procesar archivos CSV con datos bancarios y persistirlos en una base de datos MySQL, replicando la lógica de negocio que anteriormente ejecutaban los sistemas legacy.
-
-Cada proceso batch está implementado como un Job independiente, lo que permite ejecutarlos de forma aislada según la necesidad operacional del banco. Los resultados son expuestos a través de tres canales BFF (Backend for Frontend): web, móvil y cajero automático.
+- **bank-xyz-batch**: procesa archivos CSV con datos bancarios mediante Spring Batch y los persiste en MySQL.
+- **bank-xyz-bff**: expone los datos procesados a través de tres canales BFF diferenciados (web, móvil y cajero), con autenticación por canal y comunicación HTTPS.
 
 ---
 
 ## Arquitectura
 
-El proyecto sigue la arquitectura estándar de Spring Batch, donde cada Job está compuesto por uno o más Steps que encadenan tres componentes principales:
-
-- **ItemReader:** Lee los datos desde un archivo CSV línea por línea y los convierte en objetos Java. Se utiliza `FlatFileItemReader` configurado con el delimitador y los nombres de columna correspondientes a cada archivo. En contextos multi-thread, el reader está envuelto en un `SynchronizedItemStreamReader` para garantizar thread-safety.
-
-- **ItemProcessor:** Recibe cada objeto del Reader, aplica la lógica de negocio (validaciones, transformaciones o cálculos) y retorna el objeto procesado. Si detecta un dato inválido, lanza una `InvalidBankDataException` que es capturada por la `BankSkipPolicy`, permitiendo omitir el registro sin interrumpir el Job.
-
-- **ItemWriter:** Recibe los objetos procesados y los persiste en MySQL mediante `JdbcBatchItemWriter`, ejecutando el INSERT correspondiente a cada tabla.
-
-El flujo de datos es el siguiente:
 ```
 CSV → ItemReader → ItemProcessor → ItemWriter → MySQL
-                                       ↓
-                               ResumenWriter → MySQL (tablas de resumen)
-                                       ↓
-                               BffDataService → BFF Controllers → Clientes
+                                                  ↑
+                                         bank-xyz-batch
+                                                  ↓
+                                         bank-xyz-bff
+                                                  ↓
+                              BffDataService → Controllers → Clientes
+                              (Web / Mobile / ATM)
 ```
 
-Los Jobs de transacciones diarias y estados de cuenta anuales incorporan un segundo Step que consolida los datos procesados en tablas de resumen independientes.
-
-Los Jobs se lanzan a través de endpoints REST expuestos por el `JobController`. Los datos procesados son consultados por tres controladores BFF diferenciados según el canal de consumo.
+Ambos servicios y la base de datos se orquestan mediante Docker Compose desde la raíz del repositorio.
 
 ---
 
-## Jobs implementados
+## Estructura del repositorio
 
-### dailyTransactionReportJob
-
-Procesa el archivo `transacciones.csv` en dos Steps encadenados. El Processor valida monto, tipo y fecha de cada transacción, lanzando `InvalidBankDataException` para los registros que no cumplen. Las transacciones válidas se persisten en `transaccion_reporte`. Un segundo Step genera un resumen consolidado en `transaccion_resumen`.
-
-| Componente | Clase | Descripción |
-|------------|-------|-------------|
-| Reader | `FlatFileItemReader` | Lee `transacciones.csv` |
-| Processor | `TransaccionProcessor` | Valida monto, tipo y normaliza fecha |
-| Writer (Step 1) | `JdbcBatchItemWriter` | Inserta en `transaccion_reporte` |
-| Writer (Step 2) | `TransaccionResumenWriter` | Consolida resumen en `transaccion_resumen` |
-
----
-
-### monthlyInterestJob
-
-Procesa el archivo `intereses.csv` que contiene las cuentas bancarias con sus saldos y tipos. El Processor aplica una tasa de interés según el tipo de cuenta (`ahorro` 3%, `prestamo` 7%, `hipoteca` 5%), calcula el interés generado y el saldo final. Las cuentas con saldo nulo, cero o negativo, y las de tipo desconocido (`-1`, `unknown`) son descartadas. Los resultados se persisten en `interes_reporte`.
-
-| Componente | Clase | Descripción |
-|------------|-------|-------------|
-| Reader | `FlatFileItemReader` | Lee `intereses.csv` |
-| Processor | `InteresProcessor` | Calcula interés según tipo de cuenta |
-| Writer | `JdbcBatchItemWriter` | Inserta en `interes_reporte` |
-
----
-
-### annualStatementJob
-
-Procesa el archivo `cuentas_anuales.csv` en dos Steps encadenados. El Processor valida monto, tipo de movimiento y fecha, descartando registros inválidos. Los movimientos válidos se persisten en `cuenta_anual_reporte`. Un segundo Step consolida los movimientos por `cuenta_id` en `cuenta_anual_resumen`.
-
-| Componente | Clase | Descripción |
-|------------|-------|-------------|
-| Reader | `FlatFileItemReader` | Lee `cuentas_anuales.csv` |
-| Processor | `CuentaAnualProcessor` | Valida monto, tipo y normaliza fecha |
-| Writer (Step 1) | `JdbcBatchItemWriter` | Inserta en `cuenta_anual_reporte` |
-| Writer (Step 2) | `CuentaAnualResumenWriter` | Consolida resumen en `cuenta_anual_resumen` |
-
----
-
-## BFF — Backend for Frontend
-
-El proyecto expone tres controladores BFF diferenciados según el canal de consumo. Cada uno retorna únicamente los campos relevantes para su canal, consumiendo los datos desde `BffDataService`.
-
-### Web BFF (`/web/**`)
-
-Canal completo con acceso a todos los datos y campos disponibles.
-
-| Endpoint | Método | Descripción |
-|---|---|---|
-| `/web/transacciones` | GET | Todas las transacciones (filtrable por `?tipo=`) |
-| `/web/transacciones/resumen` | GET | Resumen consolidado de transacciones |
-| `/web/cuentas` | GET | Todos los movimientos anuales |
-| `/web/cuentas/{id}` | GET | Movimientos de una cuenta específica |
-| `/web/cuentas/resumen` | GET | Resumen consolidado por cuenta |
-| `/web/intereses` | GET | Todos los intereses (filtrable por `?tipo=`) |
-| `/web/intereses/{cuentaId}` | GET | Intereses de una cuenta específica |
-
-### Mobile BFF (`/mobile/**`)
-
-Canal móvil con campos reducidos para optimizar el ancho de banda.
-
-| Endpoint | Método | Descripción |
-|---|---|---|
-| `/mobile/transacciones` | GET | Transacciones con campos `monto`, `tipo`, `estado` |
-| `/mobile/transacciones/resumen` | GET | Resumen con `monto_total` y `total_anomalias` |
-| `/mobile/cuentas` | GET | Movimientos con campos `cuenta_id`, `monto`, `transaccion` |
-| `/mobile/cuentas/{id}` | GET | Movimientos de una cuenta específica |
-| `/mobile/intereses` | GET | Intereses con campos `cuenta_id`, `saldo`, `tipo` |
-| `/mobile/intereses/{cuentaId}` | GET | Intereses de una cuenta específica |
-
-### ATM BFF (`/atm/**`)
-
-Canal cajero con acceso mínimo enfocado en operaciones de saldo y movimientos.
-
-| Endpoint | Método | Descripción |
-|---|---|---|
-| `/atm/saldo/{cuentaId}` | GET | Saldo e interés de la cuenta (`cuenta_id`, `saldo`, `tipo`) |
-| `/atm/transacciones/{cuentaId}` | GET | Movimientos de la cuenta (`cuenta_id`, `monto`, `transaccion`) |
-| `/atm/resumen` | GET | Resumen global (`total_procesadas`, `total_anomalias`) |
+```
+├── bank-xyz-batch
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── bank_xyz_batch
+│   │   │   │               ├── config
+│   │   │   │               │   ├── AnnualStatementJobConfig.java
+│   │   │   │               │   ├── DailyTransactionJobConfig.java
+│   │   │   │               │   └── MonthlyInterestJobConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── JobController.java
+│   │   │   │               ├── exception
+│   │   │   │               │   └── InvalidBankDataException.java
+│   │   │   │               ├── listener
+│   │   │   │               │   ├── BankSkipListener.java
+│   │   │   │               │   └── JobCompletionListener.java
+│   │   │   │               ├── model
+│   │   │   │               │   ├── CuentaAnual.java
+│   │   │   │               │   ├── CuentaAnualResumen.java
+│   │   │   │               │   ├── Interes.java
+│   │   │   │               │   ├── Transaccion.java
+│   │   │   │               │   └── TransaccionResumen.java
+│   │   │   │               ├── policy
+│   │   │   │               │   └── BankSkipPolicy.java
+│   │   │   │               ├── processor
+│   │   │   │               │   ├── CuentaAnualProcessor.java
+│   │   │   │               │   ├── InteresProcessor.java
+│   │   │   │               │   └── TransaccionProcessor.java
+│   │   │   │               ├── util
+│   │   │   │               │   └── DateParser.java
+│   │   │   │               ├── writer
+│   │   │   │               │   ├── CuentaAnualResumenWriter.java
+│   │   │   │               │   └── TransaccionResumenWriter.java
+│   │   │   │               └── BankXyzBatchApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       ├── application.properties
+│   │   │       ├── cuentas_anuales.csv
+│   │   │       ├── intereses.csv
+│   │   │       ├── schema.sql
+│   │   │       └── transacciones.csv
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── bank_xyz_batch
+│   │                       └── BankXyzBatchApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── bank-xyz-bff
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── bank_xyz_bff
+│   │   │   │               ├── config
+│   │   │   │               │   ├── HttpRedirectConfig.java
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   ├── AtmBffController.java
+│   │   │   │               │   ├── MobileBffController.java
+│   │   │   │               │   └── WebBffController.java
+│   │   │   │               ├── dto
+│   │   │   │               │   ├── cuenta
+│   │   │   │               │   │   ├── CuentaAnualDto.java
+│   │   │   │               │   │   ├── CuentaAnualMobileDto.java
+│   │   │   │               │   │   └── CuentaAnualResumenDto.java
+│   │   │   │               │   ├── interes
+│   │   │   │               │   │   ├── InteresDto.java
+│   │   │   │               │   │   └── InteresMobileDto.java
+│   │   │   │               │   ├── resumen
+│   │   │   │               │   │   ├── ResumenAtmDto.java
+│   │   │   │               │   │   └── ResumenMobileDto.java
+│   │   │   │               │   ├── transaccion
+│   │   │   │               │   │   ├── TransaccionDto.java
+│   │   │   │               │   │   ├── TransaccionMobileDto.java
+│   │   │   │               │   │   └── TransaccionResumenDto.java
+│   │   │   │               │   └── ApiResponse.java
+│   │   │   │               ├── exception
+│   │   │   │               │   ├── GlobalExceptionHandler.java
+│   │   │   │               │   └── ResourceNotFoundException.java
+│   │   │   │               ├── service
+│   │   │   │               │   └── BffDataService.java
+│   │   │   │               └── BankXyzBffApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       ├── application.properties
+│   │   │       └── keystore.p12
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── bank_xyz_bff
+│   │                       ├── controller
+│   │                       │   ├── AtmBffControllerTest.java
+│   │                       │   ├── MobileBffControllerTest.java
+│   │                       │   └── WebBffControllerTest.java
+│   │                       └── BankXyzBffApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── docs
+│   ├── Postman
+│   └── images
+├── .gitattributes
+├── .gitignore
+├── README.md
+└── docker-compose.yml
+```
 
 ---
 
@@ -130,291 +171,319 @@ Canal cajero con acceso mínimo enfocado en operaciones de saldo y movimientos.
 - Docker / Docker Compose
 - Lombok
 
+---
+
 ## Requisitos previos
 
 - Java 21
 - Maven
 - Docker Desktop
-- Postman (para ejecutar la colección de pruebas)
+- Postman
+
+---
+
+## Generación del keystore (SSL)
+
+El BFF requiere un certificado autofirmado para HTTPS. Antes de compilar el proyecto BFF, genera el keystore ejecutando este comando desde la raíz de `bank-xyz-bff/`:
+
+```bash
+keytool -genkeypair -alias bank-xyz-bff -keyalg RSA -keysize 2048 -storetype PKCS12 -keystore src/main/resources/keystore.p12 -validity 365 -dname "CN=bank-xyz, OU=Duoc, O=BankXYZ, L=Santiago, ST=RM, C=CL" -storepass bankxyz2024
+```
+
+El archivo generado (`keystore.p12`) ya está incluido en el repositorio para facilitar el build.
 
 ---
 
 ## Configuración y ejecución
 
-### 1. Levantar la base de datos
+### Opción A — Docker Compose (recomendado)
+
+Levanta los tres servicios desde la raíz del repositorio:
 
 ```bash
-docker-compose up -d
+# 1. Compilar los JARs de ambos proyectos
+cd bank-xyz-batch
+./mvnw package -DskipTests
+cd ..
+
+cd bank-xyz-bff
+./mvnw package -DskipTests
+cd ..
+
+# 2. Levantar todos los servicios
+docker-compose up --build
 ```
 
-### 2. Compilar el proyecto
+Los servicios quedan disponibles en:
+
+| Servicio | URL |
+|---|---|
+| MySQL | `localhost:3306` |
+| bank-xyz-batch | `http://localhost:8080` |
+| bank-xyz-bff | `https://localhost:8443` |
+
+### Opción B — Ejecución local
 
 ```bash
-./mvnw clean install -DskipTests
-```
+# 1. Levantar solo MySQL
+docker-compose up mysql -d
 
-### 3. Ejecutar la aplicación
+# 2. Ejecutar batch (en una terminal)
+cd bank-xyz-batch && ./mvnw spring-boot:run
 
-```bash
-./mvnw spring-boot:run
-```
-
-### 4. Importar la colección Postman
-
-Importar el archivo `bank-xyz.postman_collection.json` incluido en la raíz del repositorio. La colección incluye una variable `base_url` configurada en `http://localhost:8080`.
-
-### 5. Ejecutar los Jobs
-
-Los Jobs aceptan parámetros opcionales `threads` y `chunkSize`. Si no se especifican, se usan los valores definidos en `application.properties`.
-
-```properties
-batch.thread-pool-size=3
-batch.chunk-size=10
+# 3. Ejecutar BFF (en otra terminal)
+cd bank-xyz-bff && ./mvnw spring-boot:run
 ```
 
 ---
 
-## Estructura del proyecto
+## Jobs implementados
 
+### dailyTransactionReportJob
 
-```
-├── .mvn
-│   └── wrapper
-│       └── maven-wrapper.properties
-├── docs
-│   ├── Postman
-│   └── images
-├── src
-│   ├── main
-│   │   ├── java
-│   │   │   └── com
-│   │   │       └── duoc
-│   │   │           └── bank_xyz
-│   │   │               ├── config
-│   │   │               │   ├── AnnualStatementJobConfig.java
-│   │   │               │   ├── DailyTransactionJobConfig.java
-│   │   │               │   ├── MonthlyInterestJobConfig.java
-│   │   │               │   └── SecurityConfig.java
-│   │   │               ├── controller
-│   │   │               │   ├── AtmBffController.java
-│   │   │               │   ├── JobController.java
-│   │   │               │   ├── MobileBffController.java
-│   │   │               │   └── WebBffController.java
-│   │   │               ├── exception
-│   │   │               │   └── InvalidBankDataException.java
-│   │   │               ├── listener
-│   │   │               │   ├── BankSkipListener.java
-│   │   │               │   └── JobCompletionListener.java
-│   │   │               ├── model
-│   │   │               │   ├── CuentaAnual.java
-│   │   │               │   ├── CuentaAnualResumen.java
-│   │   │               │   ├── Interes.java
-│   │   │               │   ├── Transaccion.java
-│   │   │               │   └── TransaccionResumen.java
-│   │   │               ├── policy
-│   │   │               │   └── BankSkipPolicy.java
-│   │   │               ├── processor
-│   │   │               │   ├── CuentaAnualProcessor.java
-│   │   │               │   ├── InteresProcessor.java
-│   │   │               │   └── TransaccionProcessor.java
-│   │   │               ├── service
-│   │   │               │   └── BffDataService.java
-│   │   │               ├── util
-│   │   │               │   └── DateParser.java
-│   │   │               ├── writer
-│   │   │               │   ├── CuentaAnualResumenWriter.java
-│   │   │               │   └── TransaccionResumenWriter.java
-│   │   │               └── BankXyzApplication.java
-│   │   └── resources
-│   │       ├── static
-│   │       ├── templates
-│   │       ├── application.properties
-│   │       ├── cuentas_anuales.csv
-│   │       ├── intereses.csv
-│   │       ├── schema.sql
-│   │       └── transacciones.csv
-│   └── test
-│       └── java
-│           └── com
-│               └── duoc
-│                   └── bank_xyz
-│                       └── BankXyzApplicationTests.java
-├── .gitattributes
-├── .gitignore
-├── README.md
-├── docker-compose.yml
-├── mvnw
-├── mvnw.cmd
-└── pom.xml
-```
+Procesa `transacciones.csv` en dos Steps. Valida monto, tipo y fecha. Persiste en `transaccion_reporte` y genera resumen en `transaccion_resumen`.
+
+| Componente | Clase | Descripción |
+|---|---|---|
+| Reader | `FlatFileItemReader` | Lee `transacciones.csv` |
+| Processor | `TransaccionProcessor` | Valida monto, tipo y normaliza fecha |
+| Writer (Step 1) | `JdbcBatchItemWriter` | Inserta en `transaccion_reporte` |
+| Writer (Step 2) | `TransaccionResumenWriter` | Consolida en `transaccion_resumen` |
+
+### monthlyInterestJob
+
+Procesa `intereses.csv`. Aplica tasa según tipo de cuenta (ahorro 3%, préstamo 7%, hipoteca 5%). Persiste en `interes_reporte`.
+
+| Componente | Clase | Descripción |
+|---|---|---|
+| Reader | `FlatFileItemReader` | Lee `intereses.csv` |
+| Processor | `InteresProcessor` | Calcula interés según tipo de cuenta |
+| Writer | `JdbcBatchItemWriter` | Inserta en `interes_reporte` |
+
+### annualStatementJob
+
+Procesa `cuentas_anuales.csv` en dos Steps. Valida monto, tipo y fecha. Persiste en `cuenta_anual_reporte` y consolida en `cuenta_anual_resumen`.
+
+| Componente | Clase | Descripción |
+|---|---|---|
+| Reader | `FlatFileItemReader` | Lee `cuentas_anuales.csv` |
+| Processor | `CuentaAnualProcessor` | Valida monto, tipo y normaliza fecha |
+| Writer (Step 1) | `JdbcBatchItemWriter` | Inserta en `cuenta_anual_reporte` |
+| Writer (Step 2) | `CuentaAnualResumenWriter` | Consolida en `cuenta_anual_resumen` |
 
 ---
 
-## Manejo de errores y tolerancia a fallos
+## BFF — Backend for Frontend
+
+El BFF corre en `bank-xyz-bff` en el puerto 8443 (HTTPS). Cada canal tiene su propio usuario y rol. Las respuestas usan DTOs tipados envueltos en `ApiResponse<T>`.
+
+### Autenticación
+
+Autenticación HTTP Basic por canal:
+
+| Canal | Usuario | Contraseña | Rol |
+|---|---|---|---|
+| Web | `web_user` | `web_pass_2024` | `ROLE_WEB` |
+| Mobile | `mobile_user` | `mobile_pass_2024` | `ROLE_MOBILE` |
+| ATM | `atm_user` | `atm_pass_2024` | `ROLE_ATM` |
+
+> En Postman desactivar **SSL certificate verification** (Settings → General).
+
+### Formato de respuesta exitosa
+
+```json
+{
+  "canal": "web",
+  "estado": "ok",
+  "datos": [ ... ]
+}
+```
+
+### Formato de respuesta de error
+
+```json
+{
+  "estado": "error",
+  "codigo": 404,
+  "mensaje": "Cuenta no encontrada: 9999"
+}
+```
+
+### Web BFF (`/web/**`)
+
+Canal completo con todos los campos disponibles.
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/web/transacciones` | GET | Todas las transacciones (filtrable por `?tipo=`) |
+| `/web/transacciones/resumen` | GET | Resumen consolidado |
+| `/web/cuentas` | GET | Todos los movimientos anuales |
+| `/web/cuentas/{id}` | GET | Movimientos de una cuenta |
+| `/web/cuentas/resumen` | GET | Resumen consolidado por cuenta |
+| `/web/intereses` | GET | Todos los intereses (filtrable por `?tipo=`) |
+| `/web/intereses/{cuentaId}` | GET | Intereses de una cuenta |
+
+### Mobile BFF (`/mobile/**`)
+
+Campos reducidos para optimizar ancho de banda.
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/mobile/transacciones` | GET | `monto`, `tipo`, `estado` |
+| `/mobile/transacciones/resumen` | GET | `montoTotal`, `totalAnomalias` |
+| `/mobile/cuentas` | GET | `cuentaId`, `monto`, `transaccion` |
+| `/mobile/cuentas/{id}` | GET | Movimientos reducidos de una cuenta |
+| `/mobile/intereses` | GET | `cuentaId`, `saldo`, `tipo` |
+| `/mobile/intereses/{cuentaId}` | GET | Intereses reducidos de una cuenta |
+
+### ATM BFF (`/atm/**`)
+
+Acceso mínimo para operaciones de cajero.
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/atm/saldo/{cuentaId}` | GET | `cuentaId`, `saldo`, `tipo` |
+| `/atm/transacciones/{cuentaId}` | GET | `cuentaId`, `monto`, `transaccion` |
+| `/atm/resumen` | GET | `totalProcesadas`, `totalAnomalias` |
+
+---
+
+## Manejo de errores
 
 ### InvalidBankDataException
 
-Excepción personalizada lanzada por los Processors cuando detectan un dato inválido. Al lanzar una excepción en lugar de retornar `null`, el registro es capturado por la `BankSkipPolicy` y registrado por el `BankSkipListener`, otorgando trazabilidad completa sobre los datos descartados.
-
 | Job | Caso | Acción |
-|-----|------|--------|
+|---|---|---|
 | `dailyTransactionReportJob` | Monto nulo, negativo o cero | Lanza `InvalidBankDataException` |
 | `dailyTransactionReportJob` | Tipo distinto de `credito`/`debito` | Lanza `InvalidBankDataException` |
-| `dailyTransactionReportJob` | Fecha nula, vacía o formato no reconocido | Lanza `InvalidBankDataException` |
+| `dailyTransactionReportJob` | Fecha nula o formato no reconocido | Lanza `InvalidBankDataException` |
 | `monthlyInterestJob` | Saldo nulo, negativo o cero | Lanza `InvalidBankDataException` |
 | `monthlyInterestJob` | Tipo de cuenta `-1` o `unknown` | Lanza `InvalidBankDataException` |
 | `annualStatementJob` | Monto nulo, negativo o cero | Lanza `InvalidBankDataException` |
 | `annualStatementJob` | Tipo de movimiento inválido | Lanza `InvalidBankDataException` |
-| `annualStatementJob` | Fecha nula, vacía o formato no reconocido | Lanza `InvalidBankDataException` |
-
-### Normalización de fechas
-
-El dataset oficial contiene fechas en cuatro formatos distintos. La clase utilitaria `DateParser` intenta parsear cada fecha contra los cuatro formatos en orden, normalizando el resultado a `dd-MM-yyyy`. Si ningún formato coincide (ej: mes 13), lanza `InvalidBankDataException` y el registro es omitido por la `BankSkipPolicy`.
-
-| Formato entrada | Ejemplo | Resultado normalizado |
-|---|---|---|
-| `dd-MM-yyyy` | `01-06-2024` | `01-06-2024` |
-| `dd/MM/yyyy` | `01/06/2024` | `01-06-2024` |
-| `yyyy-MM-dd` | `2024-06-01` | `01-06-2024` |
-| `yyyy/MM/dd` | `2024/06/01` | `01-06-2024` |
+| `annualStatementJob` | Fecha nula o formato no reconocido | Lanza `InvalidBankDataException` |
 
 ### BankSkipPolicy
 
-Política de omisión personalizada que intercepta las siguientes excepciones y permite continuar el Job sin interrumpirlo:
-
 | Excepción | Origen |
 |---|---|
-| `FlatFileParseException` | Error de lectura o formato inválido en el CSV |
-| `InvalidBankDataException` | Dato de negocio inválido detectado por el Processor |
-| `IllegalArgumentException` | Argumento inválido en tiempo de ejecución |
-| `DataIntegrityViolationException` | Error de integridad al escribir en la base de datos |
+| `FlatFileParseException` | Error de lectura en CSV |
+| `InvalidBankDataException` | Dato inválido en Processor |
+| `IllegalArgumentException` | Argumento inválido en runtime |
+| `DataIntegrityViolationException` | Error de integridad en BD |
 
-### RetryPolicy y BackOffPolicy
-
-Cada Step está configurado con una `RetryPolicy` acotada a `DataAccessException`, que reintenta hasta 3 veces ante errores transitorios de base de datos. Los errores permanentes de datos (`InvalidBankDataException`, `FlatFileParseException`) son manejados directamente por el skip sin generar reintentos innecesarios. La `ExponentialBackOffPolicy` aplica intervalos crecientes entre reintentos (100ms → 200ms → 400ms).
+### RetryPolicy
 
 | Política | Configuración |
 |---|---|
-| Tipo de error reintentable | `DataAccessException` |
+| Tipo reintentable | `DataAccessException` |
 | Reintentos máximos | 3 |
 | Intervalo inicial | 100ms |
 | Multiplicador | 2x (exponencial) |
-
-### Listeners
-
-| Listener | Clase | Función |
-|---|---|---|
-| Job | `JobCompletionListener` | Loguea nombre, estado y duración de cada Job |
-| Skip | `BankSkipListener` | Loguea registros omitidos en lectura, proceso y escritura |
-
----
-
-## Escalado y optimización
-
-### Procesamiento multi-thread configurable
-
-Cada Job cuenta con un `ThreadPoolTaskExecutor` configurable mediante parámetros HTTP (`threads`, `chunkSize`), permitiendo ajustar el nivel de paralelismo en tiempo de ejecución sin necesidad de recompilar.
-
-```properties
-batch.thread-pool-size=3
-batch.chunk-size=10
-```
-
-Para garantizar thread-safety en la lectura concurrente, el `FlatFileItemReader` de cada Job está envuelto en un `SynchronizedItemStreamReader`.
 
 ---
 
 ## Tests
 
-El proyecto incluye un test de contexto (`contextLoads`) que verifica que la aplicación levanta correctamente con todos sus beans y configuraciones. Para evitar dependencia de MySQL durante los tests, se utiliza H2 como base de datos en memoria mediante `@TestPropertySource`.
+Los tests de integración del BFF usan `@WebMvcTest` con `@WithMockUser` y `@Import(SecurityConfig.class)`. El batch incluye un test de contexto con H2 en memoria.
 
 ```bash
-./mvnw clean test
+# Batch
+cd bank-xyz-batch && ./mvnw test
+
+# BFF
+cd bank-xyz-bff && ./mvnw test
 ```
 
-![Test inicio](docs/images/evidencia_test.png)
-![Test resultado](docs/images/evidencia_test1.png)
+| Test | Canal | Verifica |
+|---|---|---|
+| `getTransacciones_conRolWeb_retornaOk` | Web | Retorna 200 con `canal: web` y datos en array |
+| `getCuentaById_noExiste_retorna404` | Web | Retorna 404 con mensaje de error estructurado |
+| `getTransacciones_conRolIncorrecto_retorna403` | Web | Rechaza rol incorrecto con 403 |
+| `getIntereses_conRolMobile_retornaOk` | Mobile | Retorna 200 con `canal: mobile` y campos reducidos |
+| `getCuentaById_noExiste_retorna404` | Mobile | Retorna 404 con mensaje de error estructurado |
+| `getIntereses_conRolIncorrecto_retorna403` | Mobile | Rechaza rol incorrecto con 403 |
+| `getSaldo_conRolAtm_retornaOk` | ATM | Retorna 200 con `canal: atm` y saldo de la cuenta |
+| `getSaldo_cuentaNoExiste_retorna404` | ATM | Retorna 404 con mensaje de error estructurado |
+| `getSaldo_conRolIncorrecto_retorna403` | ATM | Rechaza rol incorrecto con 403 |
 
 ---
 
 ## Evidencia de ejecución
 
-Las evidencias se realizan a través de la colección Postman `bank-xyz.postman_collection.json` incluida en el repositorio.
+Las evidencias se realizan a través de la colección Postman `bank-xyz.postman_collection.json` incluida en `docs/Postman/`.
 
-### 1. Levantar base de datos
+### 1. Levantar servicios con Docker Compose
 
 ```bash
-docker-compose up -d
+docker-compose up --build
 ```
 
 ![Docker Compose](docs/images/evidencia_docker.png)
+![Docker Compose](docs/images/evidencia_docker1.png)
 
 ---
 
-### 2. Iniciar aplicación
+### 2. Ejecutar Jobs (batch en puerto 8080)
 
-```bash
-./mvnw spring-boot:run
-```
+**Job 1 - Daily Transaction Report**
 
-![App iniciada](docs/images/evidencia_app.png)
-![App iniciada consola](docs/images/evidencia_app1.png)
+![Job 1 ejecución](docs/images/evidencia_job1_ejecucion.png)
+![Job 1 consola](docs/images/evidencia_job1_consola.png)
 
----
+**Job 2 - Monthly Interest**
 
-### 3. Job 1 - Reporte de transacciones diarias
+![Job 2 ejecución](docs/images/evidencia_job2_ejecucion.png)
+![Job 2 consola](docs/images/evidencia_job2_consola.png)
 
-Carpeta **Jobs → Ejecutar Jobs → Job 1 - Daily Transaction Report**
+**Job 3 - Annual Statement**
 
-![Job 1 ejecución Postman](docs/images/evidencia_job1_ejecucion.png)
-![Job 1 consola](docs/images/evidencia_job1_ejecucion1.png)
-
-Verificación con **Web BFF → Transacciones → GET Todas las transacciones** y **GET Resumen transacciones**
-
-![Job 1 transacciones](docs/images/evidencia_job1_web_transacciones.png)
-![Job 1 resumen](docs/images/evidencia_job1_web_resumen.png)
+![Job 3 ejecución](docs/images/evidencia_job3_ejecucion.png)
+![Job 3 consola](docs/images/evidencia_job3_consola.png)
 
 ---
 
-### 4. Job 2 - Cálculo de intereses mensuales
+### 3. Web BFF (puerto 8443, usuario: web_user)
 
-Carpeta **Jobs → Ejecutar Jobs → Job 2 - Monthly Interest**
-
-![Job 2 ejecución Postman](docs/images/evidencia_job2_ejecucion.png)
-![Job 2 consola](docs/images/evidencia_job2_ejecucion1.png)
-
-Verificación con **Web BFF → Intereses → GET Todos los intereses**
-
-![Job 2 intereses](docs/images/evidencia_job2_web_intereses.png)
+![Web transacciones](docs/images/evidencia_web_transacciones.png)
+![Web resumen transacciones](docs/images/evidencia_web_resumen_transacciones.png)
+![Web cuentas](docs/images/evidencia_web_cuentas.png)
+![Web resumen cuentas](docs/images/evidencia_web_resumen_cuentas.png)
+![Web intereses](docs/images/evidencia_web_intereses.png)
 
 ---
 
-### 5. Job 3 - Estado de cuentas anuales
-
-Carpeta **Jobs → Ejecutar Jobs → Job 3 - Annual Statement**
-
-![Job 3 ejecución Postman](docs/images/evidencia_job3_ejecucion.png)
-![Job 3 consola](docs/images/evidencia_job3_ejecucion1.png)
-
-Verificación con **Web BFF → Cuentas Anuales → GET Todas las cuentas anuales** y **GET Resumen cuentas anuales**
-
-![Job 3 cuentas](docs/images/evidencia_job3_web_cuentas.png)
-![Job 3 resumen](docs/images/evidencia_job3_web_resumen.png)
-
----
-
-### 6. Verificación por canal BFF
-
-**Mobile BFF** — datos reducidos por canal móvil
+### 4. Mobile BFF (puerto 8443, usuario: mobile_user)
 
 ![Mobile transacciones](docs/images/evidencia_mobile_transacciones.png)
-![Mobile intereses](docs/images/evidencia_mobile_intereses.png)
+![Mobile resumen](docs/images/evidencia_mobile_resumen.png)
 ![Mobile cuentas](docs/images/evidencia_mobile_cuentas.png)
+![Mobile intereses](docs/images/evidencia_mobile_intereses.png)
 
-**ATM BFF** — acceso mínimo para cajero
+---
+
+### 5. ATM BFF (puerto 8443, usuario: atm_user)
 
 ![ATM saldo](docs/images/evidencia_atm_saldo.png)
 ![ATM transacciones](docs/images/evidencia_atm_transacciones.png)
 ![ATM resumen](docs/images/evidencia_atm_resumen.png)
 
 ---
+
+### 6. Verificación de seguridad — acceso con rol incorrecto (403)
+
+![403 Web con rol Mobile](docs/images/evidencia_403_web.png)
+![403 Mobile con rol ATM](docs/images/evidencia_403_mobile.png)
+![403 ATM con rol Web](docs/images/evidencia_403_atm.png)
+
+---
+
+### 7. Tests de integración BFF
+
+```bash
+cd bank-xyz-bff
+./mvnw test
+```
+
+![Tests BFF resultado](docs/images/evidencia_tests_bff.png)
+![Tests BFF resultado](docs/images/evidencia_tests_bff1.png)
