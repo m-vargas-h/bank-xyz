@@ -1,5 +1,7 @@
 package com.duoc.bank_xyz_bff.controller;
 
+import com.duoc.bank_xyz_bff.dto.vista.VistaCuentaMobileDto;
+
 import com.duoc.bank_xyz_bff.dto.ApiResponse;
 import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualMobileDto;
 import com.duoc.bank_xyz_bff.dto.interes.InteresMobileDto;
@@ -85,4 +87,17 @@ public class MobileBffController {
                 .collect(Collectors.toList());
         return ResponseEntity.ok(new ApiResponse<>("mobile", reducida));
     }
+
+    @GetMapping("/cuentas/{id}/detalle")
+        public ResponseEntity<ApiResponse<VistaCuentaMobileDto>> getVistaCuenta(@PathVariable int id) {
+        List<CuentaAnualMobileDto> movimientos = dataService.getCuentaAnualById(id).stream()
+                .map(c -> new CuentaAnualMobileDto(c.getCuentaId(), c.getMonto(), c.getTransaccion()))
+                .collect(Collectors.toList());
+        List<InteresMobileDto> intereses = dataService.getInteresByCuenta(id).stream()
+                .map(i -> new InteresMobileDto(i.getCuentaId(), i.getSaldo(), i.getTipo()))
+                .collect(Collectors.toList());
+        if (movimientos.isEmpty() && intereses.isEmpty())
+                throw new ResourceNotFoundException("Sin datos para cuenta: " + id);
+        return ResponseEntity.ok(new ApiResponse<>("mobile", new VistaCuentaMobileDto(movimientos, intereses)));
+        }
 }

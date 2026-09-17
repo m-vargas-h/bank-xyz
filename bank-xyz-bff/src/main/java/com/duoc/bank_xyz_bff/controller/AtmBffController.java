@@ -1,5 +1,7 @@
 package com.duoc.bank_xyz_bff.controller;
 
+import com.duoc.bank_xyz_bff.dto.vista.VistaCuentaAtmDto;
+
 import com.duoc.bank_xyz_bff.dto.ApiResponse;
 import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualMobileDto;
 import com.duoc.bank_xyz_bff.dto.interes.InteresMobileDto;
@@ -47,5 +49,15 @@ public class AtmBffController {
         var full = dataService.getResumenTransacciones();
         return ResponseEntity.ok(new ApiResponse<>("atm",
                 new ResumenAtmDto(full.getTotalProcesadas(), full.getTotalAnomalias())));
+    }
+
+    @GetMapping("/cuentas/{cuentaId}/detalle")
+    public ResponseEntity<ApiResponse<VistaCuentaAtmDto>> getVistaCuenta(@PathVariable int cuentaId) {
+        List<InteresMobileDto> intereses = dataService.getInteresByCuenta(cuentaId).stream()
+                .map(i -> new InteresMobileDto(i.getCuentaId(), i.getSaldo(), i.getTipo()))
+                .collect(Collectors.toList());
+        if (intereses.isEmpty())
+            throw new ResourceNotFoundException("Sin datos para cuenta: " + cuentaId);
+        return ResponseEntity.ok(new ApiResponse<>("atm", new VistaCuentaAtmDto(intereses)));
     }
 }
