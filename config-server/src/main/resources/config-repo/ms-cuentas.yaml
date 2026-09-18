@@ -1,0 +1,5 @@
+server:
+  port: 8081
+
+ms-cuentas:
+  descripcion: "Microservicio de Cuentas - Bank XYZ"
