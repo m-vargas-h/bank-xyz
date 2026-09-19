@@ -1,9 +1,13 @@
 package com.duoc.ms_cuentas.controllers;
 
+import com.duoc.ms_cuentas.services.CuentasService;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.util.concurrent.CompletableFuture;
 
 import java.util.List;
 import java.util.Map;
@@ -27,5 +31,18 @@ public class CuentasController {
     @GetMapping("/info")
     public Map<String, String> info() {
         return Map.of("servicio", descripcion, "status", "UP");
+    }
+
+    @Autowired
+    private CuentasService cuentasService;
+
+    @GetMapping("/resilience")
+    public CompletableFuture<List<Map<String, Object>>> getCuentasResiliencia() {
+        return cuentasService.getCuentasConResiliencia();
+    }
+
+    @GetMapping("/ratelimit")
+    public List<Map<String, Object>> getCuentasRateLimit() {
+        return cuentasService.getCuentasConRateLimit();
     }
 }
