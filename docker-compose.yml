@@ -1,50 +1,74 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: bank-xyz-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: bank_xyz
+  config-server:
+    build: ./config-server
+    container_name: bank-xyz-config-server
     ports:
-      - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
+      - "8888:8888"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8888/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  batch:
-    build: ./bank-xyz-batch
-    container_name: bank-xyz-batch
+  eureka-server:
+    build: ./eureka-server
+    container_name: bank-xyz-eureka-server
     ports:
-      - "8080:8080"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bank_xyz?createDatabaseIfNotExist=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
+      - "8761:8761"
     depends_on:
-      mysql:
+      config-server:
         condition: service_healthy
 
-  bff:
-    build: ./bank-xyz-bff
-    container_name: bank-xyz-bff
+  auth-server:
+    build: ./auth-server
+    container_name: bank-xyz-auth-server
     ports:
-      - "8443:8443"
-      - "8081:8080"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bank_xyz?serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
-      SERVER_SSL_KEY_STORE: classpath:keystore.p12
-      SERVER_SSL_KEY_STORE_PASSWORD: bankxyz2024
-      SERVER_SSL_KEY_STORE_TYPE: PKCS12
-      SERVER_SSL_KEY_ALIAS: bank-xyz-bff
+      - "9000:9000"
     depends_on:
-      mysql:
-        condition: service_healthy
+      eureka-server:
+        condition: service_started
 
-volumes:
-  mysql-data:
+  ms-cuentas:
+    build: ./ms-cuentas
+    container_name: bank-xyz-ms-cuentas
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://auth-server:9000/oauth2/jwks
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+
+  ms-transacciones:
+    build: ./ms-transacciones
+    container_name: bank-xyz-ms-transacciones
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://auth-server:9000/oauth2/jwks
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+
+  ms-clientes:
+    build: ./ms-clientes
+    container_name: bank-xyz-ms-clientes
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://auth-server:9000/oauth2/jwks
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
