@@ -1,0 +1,257 @@
+{
+  "info": {
+    "name": "Bank XYZ S6 — Microservicios y Seguridad",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Config Server",
+      "item": [
+        {
+          "name": "Config ms-cuentas",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8888/ms-cuentas/default"
+          }
+        },
+        {
+          "name": "Config ms-transacciones",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8888/ms-transacciones/default"
+          }
+        },
+        {
+          "name": "Config ms-clientes",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8888/ms-clientes/default"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Auth Server",
+      "item": [
+        {
+          "name": "OpenID Configuration",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:9000/.well-known/openid-configuration"
+          }
+        },
+        {
+          "name": "Obtener Token JWT",
+          "request": {
+            "method": "POST",
+            "url": "http://localhost:9000/oauth2/token",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "bank-xyz-client" },
+                { "key": "password", "value": "secret123" }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials" },
+                { "key": "scope", "value": "cuentas.read transacciones.read clientes.read" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. ms-cuentas",
+      "item": [
+        {
+          "name": "Listar Cuentas (público)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8081/api/cuentas"
+          }
+        },
+        {
+          "name": "Info ms-cuentas (público)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8081/api/cuentas/info"
+          }
+        },
+        {
+          "name": "Cuentas Resilience — sin token (401)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8081/api/cuentas/resilience"
+          }
+        },
+        {
+          "name": "Cuentas Resilience — con token (200)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8081/api/cuentas/resilience",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cuentas RateLimit — sin token (401)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8081/api/cuentas/ratelimit"
+          }
+        },
+        {
+          "name": "Cuentas RateLimit — con token (200)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8081/api/cuentas/ratelimit",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. ms-transacciones",
+      "item": [
+        {
+          "name": "Listar Transacciones (público)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8082/api/transacciones"
+          }
+        },
+        {
+          "name": "Info ms-transacciones (público)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8082/api/transacciones/info"
+          }
+        },
+        {
+          "name": "Transacciones Resilience — sin token (401)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8082/api/transacciones/resilience"
+          }
+        },
+        {
+          "name": "Transacciones Resilience — con token (200)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8082/api/transacciones/resilience",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Transacciones RateLimit — sin token (401)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8082/api/transacciones/ratelimit"
+          }
+        },
+        {
+          "name": "Transacciones RateLimit — con token (200)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8082/api/transacciones/ratelimit",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. ms-clientes",
+      "item": [
+        {
+          "name": "Listar Clientes (público)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8083/api/clientes"
+          }
+        },
+        {
+          "name": "Info ms-clientes (público)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8083/api/clientes/info"
+          }
+        },
+        {
+          "name": "Clientes Resilience — sin token (401)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8083/api/clientes/resilience"
+          }
+        },
+        {
+          "name": "Clientes Resilience — con token (200)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8083/api/clientes/resilience",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Clientes RateLimit — sin token (401)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8083/api/clientes/ratelimit"
+          }
+        },
+        {
+          "name": "Clientes RateLimit — con token (200)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8083/api/clientes/ratelimit",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{token}}" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
