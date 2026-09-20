@@ -32,7 +32,193 @@ El proyecto implementa una arquitectura de microservicios para el Banco XYZ comp
 ## Estructura del repositorio
 
 ```
-(completar con estructura actual)
+├── auth-server
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── auth_server
+│   │   │   │               ├── config
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               └── AuthServerApplication.java
+│   │   │   └── resources
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── auth_server
+│   │                       └── AuthServerApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── config-server
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── config_server
+│   │   │   │               └── ConfigServerApplication.java
+│   │   │   └── resources
+│   │   │       ├── config-repo
+│   │   │       │   ├── ms-clientes.yaml
+│   │   │       │   ├── ms-cuentas.yaml
+│   │   │       │   └── ms-transacciones.yaml
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── config_server
+│   │                       └── ConfigServerApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── docs
+│   ├── Postman
+│   └── images
+├── eureka-server
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── eureka_server
+│   │   │   │               └── EurekaServerApplication.java
+│   │   │   └── resources
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── eureka_server
+│   │                       └── EurekaServerApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── ms-clientes
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── ms_clientes
+│   │   │   │               ├── config
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── ClientesController.java
+│   │   │   │               ├── services
+│   │   │   │               │   └── ClientesService.java
+│   │   │   │               └── MsClientesApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── ms_clientes
+│   │                       └── MsClientesApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── ms-cuentas
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── ms_cuentas
+│   │   │   │               ├── config
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── CuentasController.java
+│   │   │   │               ├── services
+│   │   │   │               │   └── CuentasService.java
+│   │   │   │               └── MsCuentasApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── ms_cuentas
+│   │                       └── MsCuentasApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── ms-transacciones
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── ms_transacciones
+│   │   │   │               ├── config
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── TransaccionesController.java
+│   │   │   │               ├── services
+│   │   │   │               │   └── TransaccionesService.java
+│   │   │   │               └── MsTransaccionesApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── ms_transacciones
+│   │                       └── MsTransaccionesApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── .gitattributes
+├── .gitignore
+├── README.md
+└── docker-compose.yml
 ```
 
 ---
