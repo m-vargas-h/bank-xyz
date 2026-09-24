@@ -1,5 +1,9 @@
 package com.duoc.ms_clientes.services;
 
+import com.duoc.ms_clientes.events.TransaccionEvento;
+
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.messaging.handler.annotation.Payload;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -41,5 +45,17 @@ public class ClientesService {
 
     public List<Map<String, Object>> fallbackRateLimit(Exception e) {
         return List.of(Map.of("mensaje", "Límite de solicitudes alcanzado. Intente más tarde."));
+    }
+
+    @KafkaListener(topics = "transaccion-registrada", groupId = "ms-clientes-group")
+    public void recibirTransaccionRegistrada(@Payload TransaccionEvento evento) {
+        System.out.println("[ms-clientes] transaccion-registrada recibida: id=" + evento.getId()
+            + " | tipo=" + evento.getTipo() + " | estado=" + evento.getEstado());
+    }
+
+    @KafkaListener(topics = "cuenta-actualizada", groupId = "ms-clientes-group")
+    public void recibirCuentaActualizada(@Payload TransaccionEvento evento) {
+        System.out.println("[ms-clientes] cuenta-actualizada recibida: id=" + evento.getId()
+            + " | estado=" + evento.getEstado() + " → registrando historial del cliente.");
     }
 }

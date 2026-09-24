@@ -1,5 +1,11 @@
 package com.duoc.ms_cuentas.services;
 
+import com.duoc.ms_cuentas.events.TransaccionEvento;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.messaging.handler.annotation.Payload;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -41,5 +47,27 @@ public class CuentasService {
 
     public List<Map<String, Object>> fallbackRateLimit(Exception e) {
         return List.of(Map.of("mensaje", "Límite de solicitudes alcanzado. Intente más tarde."));
+    }
+
+    @Autowired
+    private KafkaTemplate<String, TransaccionEvento> kafkaTemplate;
+
+    private static final String TOPIC_OUT = "cuenta-actualizada";
+    private static final String TOPIC_RECHAZO = "transaccion-rechazada";
+
+    @KafkaListener(topics = "transaccion-registrada", groupId = "ms-cuentas-group")
+    public void procesarTransaccion(@Payload TransaccionEvento evento) {
+        System.out.println("[ms-cuentas] Evento recibido: " + evento.getId() + " | monto: " + evento.getMonto());
+
+        // Simulación: rechazar si monto > 2.000.000
+        if (evento.getMonto() > 2000000) {
+            System.out.println("[ms-cuentas] Saldo insuficiente. Publicando transaccion-rechazada.");
+            evento.setEstado("FALLIDA");
+            kafkaTemplate.send(TOPIC_RECHAZO, String.valueOf(evento.getId()), evento);
+        } else {
+            System.out.println("[ms-cuentas] Saldo OK. Actualizando cuenta y publicando cuenta-actualizada.");
+            evento.setEstado("COMPLETADA");
+            kafkaTemplate.send(TOPIC_OUT, String.valueOf(evento.getId()), evento);
+        }
     }
 }

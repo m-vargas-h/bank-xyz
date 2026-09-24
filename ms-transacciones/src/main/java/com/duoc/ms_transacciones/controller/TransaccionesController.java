@@ -2,6 +2,8 @@ package com.duoc.ms_transacciones.controllers;
 
 import com.duoc.ms_transacciones.services.TransaccionesService;
 
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import java.util.concurrent.CompletableFuture;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,5 +46,12 @@ public class TransaccionesController {
     @GetMapping("/ratelimit")
     public List<Map<String, Object>> getTransaccionesRateLimit() {
         return transaccionesService.getTransaccionesConRateLimit();
+    }
+
+    @PostMapping
+    public Map<String, Object> crearTransaccion(@RequestBody Map<String, Object> body) {
+        int monto = (int) body.get("monto");
+        String tipo = (String) body.get("tipo");
+        return transaccionesService.registrarTransaccion(monto, tipo);
     }
 }

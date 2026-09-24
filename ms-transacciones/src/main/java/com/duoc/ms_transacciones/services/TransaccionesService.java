@@ -1,5 +1,11 @@
 package com.duoc.ms_transacciones.services;
 
+import com.duoc.ms_transacciones.events.TransaccionEvento;
+
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -41,5 +47,36 @@ public class TransaccionesService {
 
     public List<Map<String, Object>> fallbackRateLimit(Exception e) {
         return List.of(Map.of("mensaje", "Límite de solicitudes alcanzado. Intente más tarde."));
+    }
+
+    @Autowired
+    private KafkaTemplate<String, TransaccionEvento> kafkaTemplate;
+
+    private static final String TOPIC = "transaccion-registrada";
+
+    public Map<String, Object> registrarTransaccion(int monto, String tipo) {
+        TransaccionEvento evento = new TransaccionEvento(
+            (int)(Math.random() * 1000),
+            monto,
+            tipo,
+            java.time.LocalDate.now().toString(),
+            "PENDIENTE"
+        );
+        kafkaTemplate.send(TOPIC, String.valueOf(evento.getId()), evento);
+        return Map.of(
+            "id", evento.getId(),
+            "monto", evento.getMonto(),
+            "tipo", evento.getTipo(),
+            "fecha", evento.getFecha(),
+            "estado", evento.getEstado(),
+            "mensaje", "Transacción registrada y evento publicado en Kafka"
+        );
+    }
+
+    @KafkaListener(topics = "transaccion-rechazada", groupId = "ms-transacciones-compensacion")
+    public void procesarRechazo(@Payload TransaccionEvento evento) {
+        System.out.println("[ms-transacciones] Compensación: transacción " + evento.getId()
+            + " revertida → estado FALLIDA");
+        // En un sistema real: actualizar BD con estado FALLIDA
     }
 }
