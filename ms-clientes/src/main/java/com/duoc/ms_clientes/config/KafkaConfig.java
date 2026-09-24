@@ -1,6 +1,6 @@
 package com.duoc.ms_clientes.config;
 
-import com.duoc.ms_cuentas.events.TransaccionEvento;
+import com.duoc.ms_clientes.events.TransaccionEvento;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
