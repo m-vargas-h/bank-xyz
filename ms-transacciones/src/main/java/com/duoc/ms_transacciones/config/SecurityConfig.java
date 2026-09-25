@@ -1,5 +1,6 @@
 package com.duoc.ms_transacciones.config;
 
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,7 +16,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/transacciones").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/transacciones").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/transacciones").hasAuthority("SCOPE_transacciones.write")
                 .requestMatchers("/api/transacciones/**").hasAuthority("SCOPE_transacciones.read")
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
