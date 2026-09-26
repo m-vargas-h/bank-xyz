@@ -26,11 +26,7 @@ public class TransaccionesController {
 
     @GetMapping
     public List<Map<String, Object>> listarTransacciones() {
-        return List.of(
-            Map.of("id", 1, "monto", 150000, "tipo", "Débito", "fecha", "2026-09-01"),
-            Map.of("id", 2, "monto", 320000, "tipo", "Crédito", "fecha", "2026-09-05"),
-            Map.of("id", 3, "monto", 85000, "tipo", "Débito", "fecha", "2026-09-10")
-        );
+        return transaccionesService.listarTransacciones();
     }
 
     @GetMapping("/info")
@@ -54,4 +50,5 @@ public class TransaccionesController {
         String tipo = (String) body.get("tipo");
         return transaccionesService.registrarTransaccion(monto, tipo);
     }
+
 }
