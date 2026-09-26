@@ -1,30 +1,73 @@
-# Bank XYZ — Microservicios y Seguridad en la Nube con Spring Cloud
+# Bank XYZ — Tolerancia a Fallos y Arquitectura de Eventos con Kafka
 
-Implementación de microservicios bancarios utilizando Spring Cloud, con configuración centralizada, service discovery, tolerancia a fallos y autenticación OAuth2.
-
-## Descripción
-
-El proyecto implementa una arquitectura de microservicios para el Banco XYZ compuesta por seis servicios independientes:
-
-- **config-server**: servidor de configuración centralizada para todos los microservicios.
-- **eureka-server**: servidor de service discovery donde se registran los microservicios.
-- **auth-server**: servidor de autorización OAuth2 que emite tokens JWT.
-- **ms-cuentas**: microservicio de cuentas bancarias con tolerancia a fallos y seguridad JWT.
-- **ms-transacciones**: microservicio de transacciones bancarias con tolerancia a fallos y seguridad JWT.
-- **ms-clientes**: microservicio de clientes bancarios con tolerancia a fallos y seguridad JWT.
+Extensión de la arquitectura de microservicios bancarios incorporando comunicación asíncrona mediante Apache Kafka bajo el Patrón Saga con Coreografía, integración con base de datos MySQL poblada por Spring Batch, y tolerancia a fallos con Resilience4j.
 
 ---
 
-## Arquitectura
+## Descripción
+
+El proyecto implementa una arquitectura orientada a eventos para el Banco XYZ, compuesta por diez servicios independientes:
+
+- **config-server**: configuración centralizada para todos los microservicios.
+- **eureka-server**: service discovery donde se registran los microservicios.
+- **auth-server**: servidor de autorización OAuth2 que emite tokens JWT.
+- **bank-xyz-batch**: jobs de Spring Batch que procesan y persisten datos bancarios en MySQL.
+- **mysql**: base de datos relacional que almacena los datos procesados por el batch.
+- **zookeeper**: coordinador requerido por Kafka.
+- **kafka**: broker de mensajería para la comunicación asíncrona entre microservicios.
+- **ms-cuentas**: microservicio de cuentas bancarias — consumer y producer Kafka.
+- **ms-transacciones**: microservicio de transacciones — producer principal Kafka.
+- **ms-clientes**: microservicio de clientes — consumer final Kafka.
+
+---
+
+## Arquitectura de eventos — Patrón Saga con Coreografía
+
+El sistema implementa el Patrón Saga con Coreografía sobre Apache Kafka. Cada microservicio actúa de forma autónoma, publicando y consumiendo eventos sin un orquestador central.
+
+### Tópicos Kafka
+
+| Tópico | Productor | Consumidor(es) |
+|---|---|---|
+| `transaccion-registrada` | ms-transacciones | ms-cuentas, ms-clientes |
+| `cuenta-actualizada` | ms-cuentas | ms-clientes |
+| `notificacion-cliente` | ms-clientes | Sistema externo / log |
+| `transaccion-rechazada` | ms-cuentas (fallo) | ms-transacciones (compensación) |
+
+### Flujo feliz (happy path)
+
+```
+Cliente → POST /api/transacciones → ms-transacciones
+  → publica transaccion-registrada
+    → ms-cuentas consume → verifica saldo OK → publica cuenta-actualizada
+    → ms-clientes consume transaccion-registrada
+    → ms-clientes consume cuenta-actualizada → registra historial
+```
+
+### Flujo compensatorio (Saga rollback)
+
+```
+ms-cuentas detecta saldo insuficiente
+  → publica transaccion-rechazada
+    → ms-transacciones consume → actualiza estado → FALLIDA
+```
+
+---
+
+## Arquitectura general
 
 ```
 [Config Server :8888]
         ↑ configuración centralizada
 [Eureka Server :8761]
         ↑ service discovery
-[ms-cuentas :8081] [ms-transacciones :8082] [ms-clientes :8083]
-        ↑ autenticación JWT
 [Auth Server :9000]
+        ↑ tokens JWT OAuth2
+[MySQL :3306] ← [bank-xyz-batch :8080]
+        ↑ datos reales
+[ms-cuentas :8081] [ms-transacciones :8082] [ms-clientes :8083]
+        ↕ eventos asincrónicos
+[Kafka :9092] ← [Zookeeper :2181]
 ```
 
 ---
@@ -32,193 +75,7 @@ El proyecto implementa una arquitectura de microservicios para el Banco XYZ comp
 ## Estructura del repositorio
 
 ```
-├── auth-server
-│   ├── .mvn
-│   │   └── wrapper
-│   │       └── maven-wrapper.properties
-│   ├── src
-│   │   ├── main
-│   │   │   ├── java
-│   │   │   │   └── com
-│   │   │   │       └── duoc
-│   │   │   │           └── auth_server
-│   │   │   │               ├── config
-│   │   │   │               │   └── SecurityConfig.java
-│   │   │   │               └── AuthServerApplication.java
-│   │   │   └── resources
-│   │   │       └── application.yaml
-│   │   └── test
-│   │       └── java
-│   │           └── com
-│   │               └── duoc
-│   │                   └── auth_server
-│   │                       └── AuthServerApplicationTests.java
-│   ├── .gitattributes
-│   ├── .gitignore
-│   ├── Dockerfile
-│   ├── mvnw
-│   ├── mvnw.cmd
-│   └── pom.xml
-├── config-server
-│   ├── .mvn
-│   │   └── wrapper
-│   │       └── maven-wrapper.properties
-│   ├── src
-│   │   ├── main
-│   │   │   ├── java
-│   │   │   │   └── com
-│   │   │   │       └── duoc
-│   │   │   │           └── config_server
-│   │   │   │               └── ConfigServerApplication.java
-│   │   │   └── resources
-│   │   │       ├── config-repo
-│   │   │       │   ├── ms-clientes.yaml
-│   │   │       │   ├── ms-cuentas.yaml
-│   │   │       │   └── ms-transacciones.yaml
-│   │   │       └── application.yaml
-│   │   └── test
-│   │       └── java
-│   │           └── com
-│   │               └── duoc
-│   │                   └── config_server
-│   │                       └── ConfigServerApplicationTests.java
-│   ├── .gitattributes
-│   ├── .gitignore
-│   ├── Dockerfile
-│   ├── mvnw
-│   ├── mvnw.cmd
-│   └── pom.xml
-├── docs
-│   ├── Postman
-│   └── images
-├── eureka-server
-│   ├── .mvn
-│   │   └── wrapper
-│   │       └── maven-wrapper.properties
-│   ├── src
-│   │   ├── main
-│   │   │   ├── java
-│   │   │   │   └── com
-│   │   │   │       └── duoc
-│   │   │   │           └── eureka_server
-│   │   │   │               └── EurekaServerApplication.java
-│   │   │   └── resources
-│   │   │       └── application.yaml
-│   │   └── test
-│   │       └── java
-│   │           └── com
-│   │               └── duoc
-│   │                   └── eureka_server
-│   │                       └── EurekaServerApplicationTests.java
-│   ├── .gitattributes
-│   ├── .gitignore
-│   ├── Dockerfile
-│   ├── mvnw
-│   ├── mvnw.cmd
-│   └── pom.xml
-├── ms-clientes
-│   ├── .mvn
-│   │   └── wrapper
-│   │       └── maven-wrapper.properties
-│   ├── src
-│   │   ├── main
-│   │   │   ├── java
-│   │   │   │   └── com
-│   │   │   │       └── duoc
-│   │   │   │           └── ms_clientes
-│   │   │   │               ├── config
-│   │   │   │               │   └── SecurityConfig.java
-│   │   │   │               ├── controller
-│   │   │   │               │   └── ClientesController.java
-│   │   │   │               ├── services
-│   │   │   │               │   └── ClientesService.java
-│   │   │   │               └── MsClientesApplication.java
-│   │   │   └── resources
-│   │   │       ├── static
-│   │   │       ├── templates
-│   │   │       └── application.yaml
-│   │   └── test
-│   │       └── java
-│   │           └── com
-│   │               └── duoc
-│   │                   └── ms_clientes
-│   │                       └── MsClientesApplicationTests.java
-│   ├── .gitattributes
-│   ├── .gitignore
-│   ├── Dockerfile
-│   ├── mvnw
-│   ├── mvnw.cmd
-│   └── pom.xml
-├── ms-cuentas
-│   ├── .mvn
-│   │   └── wrapper
-│   │       └── maven-wrapper.properties
-│   ├── src
-│   │   ├── main
-│   │   │   ├── java
-│   │   │   │   └── com
-│   │   │   │       └── duoc
-│   │   │   │           └── ms_cuentas
-│   │   │   │               ├── config
-│   │   │   │               │   └── SecurityConfig.java
-│   │   │   │               ├── controller
-│   │   │   │               │   └── CuentasController.java
-│   │   │   │               ├── services
-│   │   │   │               │   └── CuentasService.java
-│   │   │   │               └── MsCuentasApplication.java
-│   │   │   └── resources
-│   │   │       ├── static
-│   │   │       ├── templates
-│   │   │       └── application.yaml
-│   │   └── test
-│   │       └── java
-│   │           └── com
-│   │               └── duoc
-│   │                   └── ms_cuentas
-│   │                       └── MsCuentasApplicationTests.java
-│   ├── .gitattributes
-│   ├── .gitignore
-│   ├── Dockerfile
-│   ├── mvnw
-│   ├── mvnw.cmd
-│   └── pom.xml
-├── ms-transacciones
-│   ├── .mvn
-│   │   └── wrapper
-│   │       └── maven-wrapper.properties
-│   ├── src
-│   │   ├── main
-│   │   │   ├── java
-│   │   │   │   └── com
-│   │   │   │       └── duoc
-│   │   │   │           └── ms_transacciones
-│   │   │   │               ├── config
-│   │   │   │               │   └── SecurityConfig.java
-│   │   │   │               ├── controller
-│   │   │   │               │   └── TransaccionesController.java
-│   │   │   │               ├── services
-│   │   │   │               │   └── TransaccionesService.java
-│   │   │   │               └── MsTransaccionesApplication.java
-│   │   │   └── resources
-│   │   │       ├── static
-│   │   │       ├── templates
-│   │   │       └── application.yaml
-│   │   └── test
-│   │       └── java
-│   │           └── com
-│   │               └── duoc
-│   │                   └── ms_transacciones
-│   │                       └── MsTransaccionesApplicationTests.java
-│   ├── .gitattributes
-│   ├── .gitignore
-│   ├── Dockerfile
-│   ├── mvnw
-│   ├── mvnw.cmd
-│   └── pom.xml
-├── .gitattributes
-├── .gitignore
-├── README.md
-└── docker-compose.yml
+
 ```
 
 ---
@@ -228,11 +85,14 @@ El proyecto implementa una arquitectura de microservicios para el Banco XYZ comp
 - Java 21
 - Spring Boot 3.5.0
 - Spring Cloud 2025.0.0
+- Spring Kafka 3.3.6 / Apache Kafka 3.9.1
 - Spring Security OAuth2 Authorization Server
 - Spring Security OAuth2 Resource Server
 - Resilience4j (Circuit Breaker, Retry, TimeLimiter, RateLimiter)
 - Netflix Eureka
 - Spring Cloud Config
+- MySQL 8.0
+- Spring Batch
 - Docker / Docker Compose
 
 ---
@@ -248,126 +108,111 @@ El proyecto implementa una arquitectura de microservicios para el Banco XYZ comp
 
 ## Configuración y ejecución
 
-### Opción A — Docker Compose (recomendado)
+### Compilar todos los proyectos
 
 ```bash
-# 1. Compilar los JARs de todos los proyectos
 cd config-server
-./mvnw package -DskipTests
+./mvnw clean package -DskipTests
+cd ../eureka-server
+./mvnw clean package -DskipTests
+cd ../auth-server
+./mvnw clean package -DskipTests
+cd ../bank-xyz-batch
+./mvnw clean package -DskipTests
+cd ../ms-cuentas
+./mvnw clean package -DskipTests
+cd ../ms-transacciones
+./mvnw clean package -DskipTests
+cd ../ms-clientes
+./mvnw clean package -DskipTests
 cd ..
-cd eureka-server
-./mvnw package -DskipTests
-cd ..
-cd auth-server
-./mvnw package -DskipTests
-cd ..
-cd ms-cuentas
-./mvnw package -DskipTests
-cd ..
-cd ms-transacciones
-./mvnw package -DskipTests
-cd ..
-cd ms-clientes
-./mvnw package -DskipTests
-cd ..
+```
 
-# 2. Levantar todos los servicios
+### Levantar todos los servicios
+
+```bash
 docker-compose up --build
 ```
 
-Los servicios quedan disponibles en:
+### Poblar la base de datos (ejecutar tras el primer levantamiento)
+
+```bash
+POST http://localhost:8080/jobs/daily-transaction
+POST http://localhost:8080/jobs/monthly-interest
+POST http://localhost:8080/jobs/annual-statement
+```
+
+### Servicios disponibles
 
 | Servicio | URL |
 |---|---|
 | Config Server | `http://localhost:8888` |
 | Eureka Server | `http://localhost:8761` |
 | Auth Server | `http://localhost:9000` |
+| Batch | `http://localhost:8080` |
 | ms-cuentas | `http://localhost:8081` |
 | ms-transacciones | `http://localhost:8082` |
 | ms-clientes | `http://localhost:8083` |
+| Kafka | `localhost:9092` |
+| MySQL | `localhost:3306` |
 
-### Opción B — Ejecución local
+---
 
-Levantar en este orden, cada uno en una terminal separada:
+## Autenticación OAuth2
 
-```bash
-# 1. Config Server
-cd config-server
-./mvnw spring-boot:run
+Todas las rutas protegidas requieren un token JWT obtenido desde el auth-server.
 
-# 2. Eureka Server
-cd eureka-server
-./mvnw spring-boot:run
+**Obtener token:**
 
-# 3. Auth Server
-cd auth-server
-./mvnw spring-boot:run
-
-# 4. Microservicios (cada uno en una consola independiente)
-cd ms-cuentas
-./mvnw spring-boot:run
-
-cd ms-transacciones
-./mvnw spring-boot:run
-
-cd ms-clientes
-./mvnw spring-boot:run
-```
+| Campo | Valor |
+|---|---|
+| URL | `POST http://localhost:9000/oauth2/token` |
+| Auth | Basic Auth |
+| client_id | `bank-xyz-client` |
+| client_secret | `secret123` |
+| grant_type | `client_credentials` |
+| scope | `transacciones.write` / `transacciones.read` / `cuentas.read` / `clientes.read` |
 
 ---
 
 ## Endpoints disponibles
 
-### Config Server
+### bank-xyz-batch (puerto 8080)
 
-| Endpoint | Descripción |
-|---|---|
-| `GET /ms-cuentas/default` | Configuración de ms-cuentas |
-| `GET /ms-transacciones/default` | Configuración de ms-transacciones |
-| `GET /ms-clientes/default` | Configuración de ms-clientes |
-
-### Auth Server
-
-| Endpoint | Descripción |
-|---|---|
-| `GET /.well-known/openid-configuration` | Metadata del servidor OAuth2 |
-| `POST /oauth2/token` | Obtención de token JWT |
-
-Credenciales del cliente OAuth2:
-
-| Campo | Valor |
-|---|---|
-| client_id | `bank-xyz-client` |
-| client_secret | `secret123` |
-| grant_type | `client_credentials` |
-| scopes disponibles | `cuentas.read`, `cuentas.write`, `transacciones.read`, `transacciones.write`, `clientes.read`, `clientes.write` |
-
-### ms-cuentas (puerto 8081)
-
-| Endpoint | Método | Acceso | Descripción |
-|---|---|---|---|
-| `/api/cuentas` | GET | Público | Lista todas las cuentas |
-| `/api/cuentas/info` | GET | Público | Info del microservicio |
-| `/api/cuentas/resilience` | GET | JWT `cuentas.read` | Lista cuentas con Circuit Breaker + Retry + TimeLimiter |
-| `/api/cuentas/ratelimit` | GET | JWT `cuentas.read` | Lista cuentas con Rate Limiter |
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/jobs/daily-transaction` | POST | Ejecuta job de transacciones diarias |
+| `/jobs/monthly-interest` | POST | Ejecuta job de intereses mensuales |
+| `/jobs/annual-statement` | POST | Ejecuta job de estados de cuenta anuales |
 
 ### ms-transacciones (puerto 8082)
 
 | Endpoint | Método | Acceso | Descripción |
 |---|---|---|---|
-| `/api/transacciones` | GET | Público | Lista todas las transacciones |
+| `/api/transacciones` | GET | Público | Lista transacciones desde BD |
+| `/api/transacciones` | POST | JWT `transacciones.write` | Registra transacción y publica evento Kafka |
 | `/api/transacciones/info` | GET | Público | Info del microservicio |
-| `/api/transacciones/resilience` | GET | JWT `transacciones.read` | Lista transacciones con Circuit Breaker + Retry + TimeLimiter |
-| `/api/transacciones/ratelimit` | GET | JWT `transacciones.read` | Lista transacciones con Rate Limiter |
+| `/api/transacciones/resilience` | GET | JWT `transacciones.read` | Circuit Breaker + Retry + TimeLimiter |
+| `/api/transacciones/ratelimit` | GET | JWT `transacciones.read` | Rate Limiter |
+
+### ms-cuentas (puerto 8081)
+
+| Endpoint | Método | Acceso | Descripción |
+|---|---|---|---|
+| `/api/cuentas` | GET | Público | Lista cuentas anuales desde BD |
+| `/api/cuentas/intereses` | GET | Público | Lista intereses desde BD |
+| `/api/cuentas/resumen` | GET | Público | Resumen de cuentas desde BD |
+| `/api/cuentas/resilience` | GET | JWT `cuentas.read` | Circuit Breaker + Retry + TimeLimiter |
+| `/api/cuentas/ratelimit` | GET | JWT `cuentas.read` | Rate Limiter |
 
 ### ms-clientes (puerto 8083)
 
 | Endpoint | Método | Acceso | Descripción |
 |---|---|---|---|
-| `/api/clientes` | GET | Público | Lista todos los clientes |
-| `/api/clientes/info` | GET | Público | Info del microservicio |
-| `/api/clientes/resilience` | GET | JWT `clientes.read` | Lista clientes con Circuit Breaker + Retry + TimeLimiter |
-| `/api/clientes/ratelimit` | GET | JWT `clientes.read` | Lista clientes con Rate Limiter |
+| `/api/clientes` | GET | Público | Lista clientes desde BD |
+| `/api/clientes/intereses` | GET | Público | Lista intereses por cliente desde BD |
+| `/api/clientes/resilience` | GET | JWT `clientes.read` | Circuit Breaker + Retry + TimeLimiter |
+| `/api/clientes/ratelimit` | GET | JWT `clientes.read` | Rate Limiter |
 
 ---
 
@@ -382,76 +227,52 @@ Credenciales del cliente OAuth2:
 
 ---
 
-## Seguridad OAuth2
-
-El flujo de autenticación es `client_credentials` (máquina a máquina):
-
-```
-Cliente → POST /oauth2/token → Auth Server → JWT
-Cliente → GET /api/.../resilience + Bearer JWT → ms-* → respuesta
-```
-
-Las rutas públicas (`/api/cuentas`, `/api/transacciones`, `/api/clientes`) no requieren token. Las rutas de resilience y ratelimit requieren un JWT válido con el scope correspondiente.
-
----
-
-## Estado actual y proyección
-
-Los microservicios trabajan actualmente con datos de prueba estáticos definidos directamente en los controllers. Esto permite demostrar el funcionamiento de la arquitectura de microservicios, la configuración centralizada, el service discovery y los patrones de seguridad y tolerancia a fallos.
-
-Como proyección, se espera integrar estos microservicios con el sistema existente de `bank-xyz-batch`, consumiendo los datos reales procesados y persistidos en la base de datos MySQL por los jobs de Spring Batch. De esta forma, `ms-cuentas`, `ms-transacciones` y `ms-clientes` expondrían información bancaria real en lugar de datos estáticos, completando así la arquitectura completa del Banco XYZ.
-
----
-
 ## Evidencia de ejecución
 
-Las evidencias se realizan a través de la colección Postman `bank-xyz-s6.postman_collection.json` incluida en `docs/postman/`.
+### 1. Contenedores levantados con Docker Compose
 
-### 1. Servicios levantados con Docker Compose
-
-![Docker Compose](docs/images/evidencia_docker.png)
-![Docker Compose](docs/images/evidencia_docker1.png)
+![Docker Compose](docs/images/evidencia_docker_s7.png)
 
 ---
 
-### 2. Config Server — configuración centralizada
+### 2. Eureka — 3 microservicios registrados
 
-![Config Server ms-cuentas](docs/images/evidencia_config_cuentas.png)
-![Config Server ms-transacciones](docs/images/evidencia_config_transacciones.png)
-![Config Server ms-clientes](docs/images/evidencia_config_clientes.png)
+![Eureka dashboard](docs/images/evidencia_eureka_s7.png)
 
 ---
 
-### 3. Eureka Server — 3 microservicios registrados
+### 3. Jobs del batch ejecutados (BD poblada)
 
-![Eureka dashboard](docs/images/evidencia_eureka.png)
+![Job transacciones diarias](docs/images/evidencia_job_transacciones_s7.png)
+![Job intereses mensuales](docs/images/evidencia_job_intereses_s7.png)
+![Job estados de cuenta](docs/images/evidencia_job_cuentas_s7.png)
 
 ---
 
-### 4. Endpoints públicos
+### 4. Datos reales desde BD — endpoints GET
 
-![ms-cuentas público](docs/images/evidencia_cuentas_publico.png)
-![ms-transacciones público](docs/images/evidencia_transacciones_publico.png)
-![ms-clientes público](docs/images/evidencia_clientes_publico.png)
+![ms-transacciones GET](docs/images/evidencia_transacciones_get_s7.png)
+![ms-cuentas GET](docs/images/evidencia_cuentas_get_s7.png)
+![ms-clientes GET](docs/images/evidencia_clientes_get_s7.png)
 
 ---
 
 ### 5. Obtención de token JWT
 
-![Token JWT](docs/images/evidencia_token.png)
+![Token JWT](docs/images/evidencia_token_s7.png)
 
 ---
 
-### 6. Endpoints protegidos — sin token (401)
+### 6. Flujo Kafka — happy path
 
-![Cuentas sin token](docs/images/evidencia_cuentas_401.png)
-![Transacciones sin token](docs/images/evidencia_transacciones_401.png)
-![Clientes sin token](docs/images/evidencia_clientes_401.png)
+![POST transacción](docs/images/evidencia_kafka_post_s7.png)
+![Logs ms-cuentas consume y publica](docs/images/evidencia_kafka_cuentas_log_s7.png)
+![Logs ms-clientes consume](docs/images/evidencia_kafka_clientes_log_s7.png)
 
 ---
 
-### 7. Endpoints protegidos — con token JWT (200)
+### 7. Flujo Kafka — compensación Saga
 
-![Cuentas resilience con token](docs/images/evidencia_cuentas_resilience.png)
-![Transacciones resilience con token](docs/images/evidencia_transacciones_resilience.png)
-![Clientes resilience con token](docs/images/evidencia_clientes_resilience.png)
+![POST transacción rechazada](docs/images/evidencia_kafka_rechazo_post_s7.png)
+![Logs ms-cuentas saldo insuficiente](docs/images/evidencia_kafka_rechazo_cuentas_s7.png)
+![Logs ms-transacciones compensación](docs/images/evidencia_kafka_compensacion_s7.png)
