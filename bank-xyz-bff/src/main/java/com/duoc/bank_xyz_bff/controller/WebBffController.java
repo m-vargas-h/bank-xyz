@@ -1,5 +1,7 @@
 package com.duoc.bank_xyz_bff.controller;
 
+import com.duoc.bank_xyz_bff.dto.vista.VistaCuentaWebDto;
+
 import com.duoc.bank_xyz_bff.dto.ApiResponse;
 import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualDto;
 import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualResumenDto;
@@ -72,5 +74,14 @@ public class WebBffController {
         List<InteresDto> data = dataService.getInteresByCuenta(cuentaId);
         if (data.isEmpty()) throw new ResourceNotFoundException("Sin intereses para cuenta: " + cuentaId);
         return ResponseEntity.ok(new ApiResponse<>("web", data));
+    }
+
+    @GetMapping("/cuentas/{id}/detalle")
+    public ResponseEntity<ApiResponse<VistaCuentaWebDto>> getVistaCuenta(@PathVariable int id) {
+        List<CuentaAnualDto> movimientos = dataService.getCuentaAnualById(id);
+        List<InteresDto> intereses = dataService.getInteresByCuenta(id);
+        if (movimientos.isEmpty() && intereses.isEmpty())
+            throw new ResourceNotFoundException("Sin datos para cuenta: " + id);
+        return ResponseEntity.ok(new ApiResponse<>("web", new VistaCuentaWebDto(movimientos, intereses)));
     }
 }

@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: ms-transacciones
+  config:
+    import: optional:configserver:http://localhost:8888
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:9000/oauth2/jwks
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+  instance:
+    prefer-ip-address: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      transaccionesService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 3
+        minimumNumberOfCalls: 5
+  retry:
+    instances:
+      transaccionesService:
+        maxAttempts: 3
+        waitDuration: 1000
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+  timelimiter:
+    instances:
+      transaccionesService:
+        timeoutDuration: 2000
+  ratelimiter:
+    instances:
+      transaccionesService:
+        limitForPeriod: 5
+        limitRefreshPeriod: 10000ms
+        timeoutDuration: 0

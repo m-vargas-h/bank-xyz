@@ -71,4 +71,9 @@ public class BffDataService {
         return jdbc.query("SELECT * FROM interes_reporte WHERE cuenta_id = ?",
                 new BeanPropertyRowMapper<>(InteresDto.class), cuentaId);
     }
+
+    // --- Vista compuesta por cuenta ---
+    public List<CuentaAnualDto> getMovimientosByCuenta(int cuentaId) {
+        return getCuentaAnualById(cuentaId);
+    }
 }
