@@ -1,4 +1,33 @@
 services:
+  config-server:
+    build: ./config-server
+    container_name: bank-xyz-config-server
+    ports:
+      - "8888:8888"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8888/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  eureka-server:
+    build: ./eureka-server
+    container_name: bank-xyz-eureka-server
+    ports:
+      - "8761:8761"
+    depends_on:
+      config-server:
+        condition: service_healthy
+
+  auth-server:
+    build: ./auth-server
+    container_name: bank-xyz-auth-server
+    ports:
+      - "9000:9000"
+    depends_on:
+      eureka-server:
+        condition: service_started
+
   mysql:
     image: mysql:8.0
     container_name: bank-xyz-mysql
@@ -28,21 +57,101 @@ services:
       mysql:
         condition: service_healthy
 
-  bff:
-    build: ./bank-xyz-bff
-    container_name: bank-xyz-bff
-    ports:
-      - "8443:8443"
-      - "8081:8080"
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: bank-xyz-zookeeper
     environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: bank-xyz-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  ms-cuentas:
+    build: ./ms-cuentas
+    container_name: bank-xyz-ms-cuentas
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://auth-server:9000/oauth2/jwks
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:9000
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bank_xyz?serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      SERVER_SSL_KEY_STORE: classpath:keystore.p12
-      SERVER_SSL_KEY_STORE_PASSWORD: bankxyz2024
-      SERVER_SSL_KEY_STORE_TYPE: PKCS12
-      SERVER_SSL_KEY_ALIAS: bank-xyz-bff
     depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+  ms-transacciones:
+    build: ./ms-transacciones
+    container_name: bank-xyz-ms-transacciones
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://auth-server:9000/oauth2/jwks
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:9000
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bank_xyz?serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+  ms-clientes:
+    build: ./ms-clientes
+    container_name: bank-xyz-ms-clientes
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://auth-server:9000/oauth2/jwks
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:9000
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bank_xyz?serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      kafka:
+        condition: service_healthy
       mysql:
         condition: service_healthy
 

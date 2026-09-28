@@ -2,6 +2,8 @@ package com.duoc.ms_transacciones.controllers;
 
 import com.duoc.ms_transacciones.services.TransaccionesService;
 
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import java.util.concurrent.CompletableFuture;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,11 +26,7 @@ public class TransaccionesController {
 
     @GetMapping
     public List<Map<String, Object>> listarTransacciones() {
-        return List.of(
-            Map.of("id", 1, "monto", 150000, "tipo", "Débito", "fecha", "2026-09-01"),
-            Map.of("id", 2, "monto", 320000, "tipo", "Crédito", "fecha", "2026-09-05"),
-            Map.of("id", 3, "monto", 85000, "tipo", "Débito", "fecha", "2026-09-10")
-        );
+        return transaccionesService.listarTransacciones();
     }
 
     @GetMapping("/info")
@@ -45,4 +43,12 @@ public class TransaccionesController {
     public List<Map<String, Object>> getTransaccionesRateLimit() {
         return transaccionesService.getTransaccionesConRateLimit();
     }
+
+    @PostMapping
+    public Map<String, Object> crearTransaccion(@RequestBody Map<String, Object> body) {
+        int monto = (int) body.get("monto");
+        String tipo = (String) body.get("tipo");
+        return transaccionesService.registrarTransaccion(monto, tipo);
+    }
+
 }

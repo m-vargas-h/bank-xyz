@@ -1,36 +1,107 @@
-# Bank XYZ - Spring Batch + BFF
+# Bank XYZ — Tolerancia a Fallos y Arquitectura de Eventos con Kafka
 
-Migración de procesos legacy del Banco XYZ utilizando Spring Batch, con exposición de datos a través del patrón Backend for Frontend (BFF).
-
-## Descripción
-
-Este proyecto implementa la migración de procesos batch del sistema legacy del Banco XYZ. El sistema está compuesto por dos aplicaciones independientes que comparten una base de datos MySQL:
-
-- **bank-xyz-batch**: procesa archivos CSV con datos bancarios mediante Spring Batch y los persiste en MySQL.
-- **bank-xyz-bff**: expone los datos procesados a través de tres canales BFF diferenciados (web, móvil y cajero), con autenticación por canal y comunicación HTTPS.
+Extensión de la arquitectura de microservicios bancarios incorporando comunicación asíncrona mediante Apache Kafka bajo el Patrón Saga con Coreografía, integración con base de datos MySQL poblada por Spring Batch, y tolerancia a fallos con Resilience4j.
 
 ---
 
-## Arquitectura
+## Descripción
+
+El proyecto implementa una arquitectura orientada a eventos para el Banco XYZ, compuesta por diez servicios independientes:
+
+- **config-server**: configuración centralizada para todos los microservicios.
+- **eureka-server**: service discovery donde se registran los microservicios.
+- **auth-server**: servidor de autorización OAuth2 que emite tokens JWT.
+- **bank-xyz-batch**: jobs de Spring Batch que procesan y persisten datos bancarios en MySQL.
+- **mysql**: base de datos relacional que almacena los datos procesados por el batch.
+- **zookeeper**: coordinador requerido por Kafka.
+- **kafka**: broker de mensajería para la comunicación asíncrona entre microservicios.
+- **ms-cuentas**: microservicio de cuentas bancarias — consumer y producer Kafka.
+- **ms-transacciones**: microservicio de transacciones — producer principal Kafka.
+- **ms-clientes**: microservicio de clientes — consumer final Kafka.
+
+---
+
+## Arquitectura de eventos — Patrón Saga con Coreografía
+
+El sistema implementa el Patrón Saga con Coreografía sobre Apache Kafka. Cada microservicio actúa de forma autónoma, publicando y consumiendo eventos sin un orquestador central.
+
+### Tópicos Kafka
+
+| Tópico | Productor | Consumidor(es) |
+|---|---|---|
+| `transaccion-registrada` | ms-transacciones | ms-cuentas, ms-clientes |
+| `cuenta-actualizada` | ms-cuentas | ms-clientes |
+| `notificacion-cliente` | ms-clientes | Sistema externo / log |
+| `transaccion-rechazada` | ms-cuentas (fallo) | ms-transacciones (compensación) |
+
+### Flujo feliz (happy path)
 
 ```
-CSV → ItemReader → ItemProcessor → ItemWriter → MySQL
-                                                  ↑
-                                         bank-xyz-batch
-                                                  ↓
-                                         bank-xyz-bff
-                                                  ↓
-                              BffDataService → Controllers → Clientes
-                              (Web / Mobile / ATM)
+Cliente → POST /api/transacciones → ms-transacciones
+  → publica transaccion-registrada
+    → ms-cuentas consume → verifica saldo OK → publica cuenta-actualizada
+    → ms-clientes consume transaccion-registrada
+    → ms-clientes consume cuenta-actualizada → registra historial
 ```
 
-Ambos servicios y la base de datos se orquestan mediante Docker Compose desde la raíz del repositorio.
+### Flujo compensatorio (Saga rollback)
+
+```
+ms-cuentas detecta saldo insuficiente
+  → publica transaccion-rechazada
+    → ms-transacciones consume → actualiza estado → FALLIDA
+```
+
+---
+
+## Arquitectura general
+
+```
+[Config Server :8888]
+        ↑ configuración centralizada
+[Eureka Server :8761]
+        ↑ service discovery
+[Auth Server :9000]
+        ↑ tokens JWT OAuth2
+[MySQL :3306] ← [bank-xyz-batch :8080]
+        ↑ datos reales
+[ms-cuentas :8081] [ms-transacciones :8082] [ms-clientes :8083]
+        ↕ eventos asincrónicos
+[Kafka :9092] ← [Zookeeper :2181]
+```
 
 ---
 
 ## Estructura del repositorio
 
 ```
+├── auth-server
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── auth_server
+│   │   │   │               ├── config
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               └── AuthServerApplication.java
+│   │   │   └── resources
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── auth_server
+│   │                       └── AuthServerApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
 ├── bank-xyz-batch
 │   ├── .mvn
 │   │   └── wrapper
@@ -71,8 +142,6 @@ Ambos servicios y la base de datos se orquestan mediante Docker Compose desde la
 │   │   │   │               │   └── TransaccionResumenWriter.java
 │   │   │   │               └── BankXyzBatchApplication.java
 │   │   │   └── resources
-│   │   │       ├── static
-│   │   │       ├── templates
 │   │   │       ├── application.properties
 │   │   │       ├── cuentas_anuales.csv
 │   │   │       ├── intereses.csv
@@ -86,11 +155,11 @@ Ambos servicios y la base de datos se orquestan mediante Docker Compose desde la
 │   │                       └── BankXyzBatchApplicationTests.java
 │   ├── .gitattributes
 │   ├── .gitignore
-│   ├── Dockerfile
+│   ├── dockerfile
 │   ├── mvnw
 │   ├── mvnw.cmd
 │   └── pom.xml
-├── bank-xyz-bff
+├── config-server
 │   ├── .mvn
 │   │   └── wrapper
 │   │       └── maven-wrapper.properties
@@ -99,51 +168,20 @@ Ambos servicios y la base de datos se orquestan mediante Docker Compose desde la
 │   │   │   ├── java
 │   │   │   │   └── com
 │   │   │   │       └── duoc
-│   │   │   │           └── bank_xyz_bff
-│   │   │   │               ├── config
-│   │   │   │               │   ├── HttpRedirectConfig.java
-│   │   │   │               │   └── SecurityConfig.java
-│   │   │   │               ├── controller
-│   │   │   │               │   ├── AtmBffController.java
-│   │   │   │               │   ├── MobileBffController.java
-│   │   │   │               │   └── WebBffController.java
-│   │   │   │               ├── dto
-│   │   │   │               │   ├── cuenta
-│   │   │   │               │   │   ├── CuentaAnualDto.java
-│   │   │   │               │   │   ├── CuentaAnualMobileDto.java
-│   │   │   │               │   │   └── CuentaAnualResumenDto.java
-│   │   │   │               │   ├── interes
-│   │   │   │               │   │   ├── InteresDto.java
-│   │   │   │               │   │   └── InteresMobileDto.java
-│   │   │   │               │   ├── resumen
-│   │   │   │               │   │   ├── ResumenAtmDto.java
-│   │   │   │               │   │   └── ResumenMobileDto.java
-│   │   │   │               │   ├── transaccion
-│   │   │   │               │   │   ├── TransaccionDto.java
-│   │   │   │               │   │   ├── TransaccionMobileDto.java
-│   │   │   │               │   │   └── TransaccionResumenDto.java
-│   │   │   │               │   └── ApiResponse.java
-│   │   │   │               ├── exception
-│   │   │   │               │   ├── GlobalExceptionHandler.java
-│   │   │   │               │   └── ResourceNotFoundException.java
-│   │   │   │               ├── service
-│   │   │   │               │   └── BffDataService.java
-│   │   │   │               └── BankXyzBffApplication.java
+│   │   │   │           └── config_server
+│   │   │   │               └── ConfigServerApplication.java
 │   │   │   └── resources
-│   │   │       ├── static
-│   │   │       ├── templates
-│   │   │       ├── application.properties
-│   │   │       └── keystore.p12
+│   │   │       ├── config-repo
+│   │   │       │   ├── ms-clientes.yaml
+│   │   │       │   ├── ms-cuentas.yaml
+│   │   │       │   └── ms-transacciones.yaml
+│   │   │       └── application.yaml
 │   │   └── test
 │   │       └── java
 │   │           └── com
 │   │               └── duoc
-│   │                   └── bank_xyz_bff
-│   │                       ├── controller
-│   │                       │   ├── AtmBffControllerTest.java
-│   │                       │   ├── MobileBffControllerTest.java
-│   │                       │   └── WebBffControllerTest.java
-│   │                       └── BankXyzBffApplicationTests.java
+│   │                   └── config_server
+│   │                       └── ConfigServerApplicationTests.java
 │   ├── .gitattributes
 │   ├── .gitignore
 │   ├── Dockerfile
@@ -153,6 +191,139 @@ Ambos servicios y la base de datos se orquestan mediante Docker Compose desde la
 ├── docs
 │   ├── Postman
 │   └── images
+├── eureka-server
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── eureka_server
+│   │   │   │               └── EurekaServerApplication.java
+│   │   │   └── resources
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── eureka_server
+│   │                       └── EurekaServerApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── ms-clientes
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── ms_clientes
+│   │   │   │               ├── config
+│   │   │   │               │   ├── KafkaConfig.java
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── ClientesController.java
+│   │   │   │               ├── events
+│   │   │   │               │   └── TransaccionEvento.java
+│   │   │   │               ├── services
+│   │   │   │               │   └── ClientesService.java
+│   │   │   │               └── MsClientesApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── ms_clientes
+│   │                       └── MsClientesApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── ms-cuentas
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── ms_cuentas
+│   │   │   │               ├── config
+│   │   │   │               │   ├── KafkaConfig.java
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── CuentasController.java
+│   │   │   │               ├── events
+│   │   │   │               │   └── TransaccionEvento.java
+│   │   │   │               ├── services
+│   │   │   │               │   └── CuentasService.java
+│   │   │   │               └── MsCuentasApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── ms_cuentas
+│   │                       └── MsCuentasApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── ms-transacciones
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── ms_transacciones
+│   │   │   │               ├── config
+│   │   │   │               │   ├── KafkaConfig.java
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── TransaccionesController.java
+│   │   │   │               ├── events
+│   │   │   │               │   └── TransaccionEvento.java
+│   │   │   │               ├── services
+│   │   │   │               │   └── TransaccionesService.java
+│   │   │   │               └── MsTransaccionesApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── ms_transacciones
+│   │                       └── MsTransaccionesApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
 ├── .gitattributes
 ├── .gitignore
 ├── README.md
@@ -164,12 +335,17 @@ Ambos servicios y la base de datos se orquestan mediante Docker Compose desde la
 ## Tecnologías
 
 - Java 21
-- Spring Boot 3.3.5
-- Spring Batch 5.1.2
-- Spring Security
+- Spring Boot 3.5.0
+- Spring Cloud 2025.0.0
+- Spring Kafka 3.3.6 / Apache Kafka 3.9.1
+- Spring Security OAuth2 Authorization Server
+- Spring Security OAuth2 Resource Server
+- Resilience4j (Circuit Breaker, Retry, TimeLimiter, RateLimiter)
+- Netflix Eureka
+- Spring Cloud Config
 - MySQL 8.0
+- Spring Batch
 - Docker / Docker Compose
-- Lombok
 
 ---
 
@@ -182,312 +358,185 @@ Ambos servicios y la base de datos se orquestan mediante Docker Compose desde la
 
 ---
 
-## Generación del keystore (SSL)
-
-El BFF requiere un certificado autofirmado para HTTPS. Antes de compilar el proyecto BFF, genera el keystore ejecutando este comando desde la raíz de `bank-xyz-bff/`:
-
-```bash
-keytool -genkeypair -alias bank-xyz-bff -keyalg RSA -keysize 2048 -storetype PKCS12 -keystore src/main/resources/keystore.p12 -validity 365 -dname "CN=bank-xyz, OU=Duoc, O=BankXYZ, L=Santiago, ST=RM, C=CL" -storepass bankxyz2024
-```
-
-El archivo generado (`keystore.p12`) ya está incluido en el repositorio para facilitar el build.
-
----
-
 ## Configuración y ejecución
 
-### Opción A — Docker Compose (recomendado)
-
-Levanta los tres servicios desde la raíz del repositorio:
+### Compilar todos los proyectos
 
 ```bash
-# 1. Compilar los JARs de ambos proyectos
-cd bank-xyz-batch
-./mvnw package -DskipTests
+cd config-server
+./mvnw clean package -DskipTests
+cd ../eureka-server
+./mvnw clean package -DskipTests
+cd ../auth-server
+./mvnw clean package -DskipTests
+cd ../bank-xyz-batch
+./mvnw clean package -DskipTests
+cd ../ms-cuentas
+./mvnw clean package -DskipTests
+cd ../ms-transacciones
+./mvnw clean package -DskipTests
+cd ../ms-clientes
+./mvnw clean package -DskipTests
 cd ..
+```
 
-cd bank-xyz-bff
-./mvnw package -DskipTests
-cd ..
+### Levantar todos los servicios
 
-# 2. Levantar todos los servicios
+```bash
 docker-compose up --build
 ```
 
-Los servicios quedan disponibles en:
+### Poblar la base de datos (ejecutar tras el primer levantamiento)
+
+```bash
+POST http://localhost:8080/jobs/daily-transaction
+POST http://localhost:8080/jobs/monthly-interest
+POST http://localhost:8080/jobs/annual-statement
+```
+
+### Servicios disponibles
 
 | Servicio | URL |
 |---|---|
+| Config Server | `http://localhost:8888` |
+| Eureka Server | `http://localhost:8761` |
+| Auth Server | `http://localhost:9000` |
+| Batch | `http://localhost:8080` |
+| ms-cuentas | `http://localhost:8081` |
+| ms-transacciones | `http://localhost:8082` |
+| ms-clientes | `http://localhost:8083` |
+| Kafka | `localhost:9092` |
 | MySQL | `localhost:3306` |
-| bank-xyz-batch | `http://localhost:8080` |
-| bank-xyz-bff | `https://localhost:8443` |
-
-### Opción B — Ejecución local
-
-```bash
-# 1. Levantar solo MySQL
-docker-compose up mysql -d
-
-# 2. Ejecutar batch (en una terminal)
-cd bank-xyz-batch
-./mvnw spring-boot:run
-
-# 3. Ejecutar BFF (en otra terminal)
-cd bank-xyz-bff
-./mvnw spring-boot:run
-```
 
 ---
 
-## Jobs implementados
+## Autenticación OAuth2
 
-### dailyTransactionReportJob
+Todas las rutas protegidas requieren un token JWT obtenido desde el auth-server.
 
-Procesa `transacciones.csv` en dos Steps. Valida monto, tipo y fecha. Persiste en `transaccion_reporte` y genera resumen en `transaccion_resumen`.
+**Obtener token:**
 
-| Componente | Clase | Descripción |
-|---|---|---|
-| Reader | `FlatFileItemReader` | Lee `transacciones.csv` |
-| Processor | `TransaccionProcessor` | Valida monto, tipo y normaliza fecha |
-| Writer (Step 1) | `JdbcBatchItemWriter` | Inserta en `transaccion_reporte` |
-| Writer (Step 2) | `TransaccionResumenWriter` | Consolida en `transaccion_resumen` |
-
-### monthlyInterestJob
-
-Procesa `intereses.csv`. Aplica tasa según tipo de cuenta (ahorro 3%, préstamo 7%, hipoteca 5%). Persiste en `interes_reporte`.
-
-| Componente | Clase | Descripción |
-|---|---|---|
-| Reader | `FlatFileItemReader` | Lee `intereses.csv` |
-| Processor | `InteresProcessor` | Calcula interés según tipo de cuenta |
-| Writer | `JdbcBatchItemWriter` | Inserta en `interes_reporte` |
-
-### annualStatementJob
-
-Procesa `cuentas_anuales.csv` en dos Steps. Valida monto, tipo y fecha. Persiste en `cuenta_anual_reporte` y consolida en `cuenta_anual_resumen`.
-
-| Componente | Clase | Descripción |
-|---|---|---|
-| Reader | `FlatFileItemReader` | Lee `cuentas_anuales.csv` |
-| Processor | `CuentaAnualProcessor` | Valida monto, tipo y normaliza fecha |
-| Writer (Step 1) | `JdbcBatchItemWriter` | Inserta en `cuenta_anual_reporte` |
-| Writer (Step 2) | `CuentaAnualResumenWriter` | Consolida en `cuenta_anual_resumen` |
+| Campo | Valor |
+|---|---|
+| URL | `POST http://localhost:9000/oauth2/token` |
+| Auth | Basic Auth |
+| client_id | `bank-xyz-client` |
+| client_secret | `secret123` |
+| grant_type | `client_credentials` |
+| scope | `transacciones.write` / `transacciones.read` / `cuentas.read` / `clientes.read` |
 
 ---
 
-## BFF — Backend for Frontend
+## Endpoints disponibles
 
-El BFF corre en `bank-xyz-bff` en el puerto 8443 (HTTPS). Cada canal tiene su propio usuario y rol. Las respuestas usan DTOs tipados envueltos en `ApiResponse<T>`.
+### bank-xyz-batch (puerto 8080)
 
-### Autenticación
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/jobs/daily-transaction` | POST | Ejecuta job de transacciones diarias |
+| `/jobs/monthly-interest` | POST | Ejecuta job de intereses mensuales |
+| `/jobs/annual-statement` | POST | Ejecuta job de estados de cuenta anuales |
 
-Autenticación HTTP Basic por canal:
+### ms-transacciones (puerto 8082)
 
-| Canal | Usuario | Contraseña | Rol |
+| Endpoint | Método | Acceso | Descripción |
 |---|---|---|---|
-| Web | `web_user` | `web_pass_2024` | `ROLE_WEB` |
-| Mobile | `mobile_user` | `mobile_pass_2024` | `ROLE_MOBILE` |
-| ATM | `atm_user` | `atm_pass_2024` | `ROLE_ATM` |
+| `/api/transacciones` | GET | Público | Lista transacciones desde BD |
+| `/api/transacciones` | POST | JWT `transacciones.write` | Registra transacción y publica evento Kafka |
+| `/api/transacciones/info` | GET | Público | Info del microservicio |
+| `/api/transacciones/resilience` | GET | JWT `transacciones.read` | Circuit Breaker + Retry + TimeLimiter |
+| `/api/transacciones/ratelimit` | GET | JWT `transacciones.read` | Rate Limiter |
 
-> En Postman desactivar **SSL certificate verification** (Settings → General).
+### ms-cuentas (puerto 8081)
 
-### Formato de respuesta exitosa
+| Endpoint | Método | Acceso | Descripción |
+|---|---|---|---|
+| `/api/cuentas` | GET | Público | Lista cuentas anuales desde BD |
+| `/api/cuentas/intereses` | GET | Público | Lista intereses desde BD |
+| `/api/cuentas/resumen` | GET | Público | Resumen de cuentas desde BD |
+| `/api/cuentas/resilience` | GET | JWT `cuentas.read` | Circuit Breaker + Retry + TimeLimiter |
+| `/api/cuentas/ratelimit` | GET | JWT `cuentas.read` | Rate Limiter |
 
-```json
-{
-  "canal": "web",
-  "estado": "ok",
-  "datos": [ ... ]
-}
-```
+### ms-clientes (puerto 8083)
 
-### Formato de respuesta de error
-
-```json
-{
-  "estado": "error",
-  "codigo": 404,
-  "mensaje": "Cuenta no encontrada: 9999"
-}
-```
-
-### Web BFF (`/web/**`)
-
-Canal completo con todos los campos disponibles.
-
-| Endpoint | Método | Descripción |
-|---|---|---|
-| `/web/transacciones` | GET | Todas las transacciones (filtrable por `?tipo=`) |
-| `/web/transacciones/resumen` | GET | Resumen consolidado |
-| `/web/cuentas` | GET | Todos los movimientos anuales |
-| `/web/cuentas/{id}` | GET | Movimientos de una cuenta |
-| `/web/cuentas/resumen` | GET | Resumen consolidado por cuenta |
-| `/web/intereses` | GET | Todos los intereses (filtrable por `?tipo=`) |
-| `/web/intereses/{cuentaId}` | GET | Intereses de una cuenta |
-
-### Mobile BFF (`/mobile/**`)
-
-Campos reducidos para optimizar ancho de banda.
-
-| Endpoint | Método | Descripción |
-|---|---|---|
-| `/mobile/transacciones` | GET | `monto`, `tipo`, `estado` |
-| `/mobile/transacciones/resumen` | GET | `montoTotal`, `totalAnomalias` |
-| `/mobile/cuentas` | GET | `cuentaId`, `monto`, `transaccion` |
-| `/mobile/cuentas/{id}` | GET | Movimientos reducidos de una cuenta |
-| `/mobile/intereses` | GET | `cuentaId`, `saldo`, `tipo` |
-| `/mobile/intereses/{cuentaId}` | GET | Intereses reducidos de una cuenta |
-
-### ATM BFF (`/atm/**`)
-
-Acceso mínimo para operaciones de cajero.
-
-| Endpoint | Método | Descripción |
-|---|---|---|
-| `/atm/saldo/{cuentaId}` | GET | `cuentaId`, `saldo`, `tipo` |
-| `/atm/transacciones/{cuentaId}` | GET | `cuentaId`, `monto`, `transaccion` |
-| `/atm/resumen` | GET | `totalProcesadas`, `totalAnomalias` |
+| Endpoint | Método | Acceso | Descripción |
+|---|---|---|---|
+| `/api/clientes` | GET | Público | Lista clientes desde BD |
+| `/api/clientes/intereses` | GET | Público | Lista intereses por cliente desde BD |
+| `/api/clientes/resilience` | GET | JWT `clientes.read` | Circuit Breaker + Retry + TimeLimiter |
+| `/api/clientes/ratelimit` | GET | JWT `clientes.read` | Rate Limiter |
 
 ---
 
-## Manejo de errores
+## Resilience4j — Patrones implementados
 
-### InvalidBankDataException
-
-| Job | Caso | Acción |
-|---|---|---|
-| `dailyTransactionReportJob` | Monto nulo, negativo o cero | Lanza `InvalidBankDataException` |
-| `dailyTransactionReportJob` | Tipo distinto de `credito`/`debito` | Lanza `InvalidBankDataException` |
-| `dailyTransactionReportJob` | Fecha nula o formato no reconocido | Lanza `InvalidBankDataException` |
-| `monthlyInterestJob` | Saldo nulo, negativo o cero | Lanza `InvalidBankDataException` |
-| `monthlyInterestJob` | Tipo de cuenta `-1` o `unknown` | Lanza `InvalidBankDataException` |
-| `annualStatementJob` | Monto nulo, negativo o cero | Lanza `InvalidBankDataException` |
-| `annualStatementJob` | Tipo de movimiento inválido | Lanza `InvalidBankDataException` |
-| `annualStatementJob` | Fecha nula o formato no reconocido | Lanza `InvalidBankDataException` |
-
-### BankSkipPolicy
-
-| Excepción | Origen |
+| Patrón | Configuración |
 |---|---|
-| `FlatFileParseException` | Error de lectura en CSV |
-| `InvalidBankDataException` | Dato inválido en Processor |
-| `IllegalArgumentException` | Argumento inválido en runtime |
-| `DataIntegrityViolationException` | Error de integridad en BD |
-
-### RetryPolicy
-
-| Política | Configuración |
-|---|---|
-| Tipo reintentable | `DataAccessException` |
-| Reintentos máximos | 3 |
-| Intervalo inicial | 100ms |
-| Multiplicador | 2x (exponencial) |
-
----
-
-## Tests
-
-Los tests de integración del BFF usan `@WebMvcTest` con `@WithMockUser` y `@Import(SecurityConfig.class)`. El batch incluye un test de contexto con H2 en memoria.
-
-```bash
-# Batch
-cd bank-xyz-batch
-./mvnw test
-
-# BFF
-cd bank-xyz-bff
-./mvnw test
-```
-
-| Test | Canal | Verifica |
-|---|---|---|
-| `getTransacciones_conRolWeb_retornaOk` | Web | Retorna 200 con `canal: web` y datos en array |
-| `getCuentaById_noExiste_retorna404` | Web | Retorna 404 con mensaje de error estructurado |
-| `getTransacciones_conRolIncorrecto_retorna403` | Web | Rechaza rol incorrecto con 403 |
-| `getIntereses_conRolMobile_retornaOk` | Mobile | Retorna 200 con `canal: mobile` y campos reducidos |
-| `getCuentaById_noExiste_retorna404` | Mobile | Retorna 404 con mensaje de error estructurado |
-| `getIntereses_conRolIncorrecto_retorna403` | Mobile | Rechaza rol incorrecto con 403 |
-| `getSaldo_conRolAtm_retornaOk` | ATM | Retorna 200 con `canal: atm` y saldo de la cuenta |
-| `getSaldo_cuentaNoExiste_retorna404` | ATM | Retorna 404 con mensaje de error estructurado |
-| `getSaldo_conRolIncorrecto_retorna403` | ATM | Rechaza rol incorrecto con 403 |
+| Circuit Breaker | Se abre con 50% de fallos en ventana de 10 llamadas; espera 10s en estado OPEN |
+| Retry | 3 intentos con backoff exponencial (x2) cada 1s |
+| Time Limiter | Timeout de 2 segundos por llamada |
+| Rate Limiter | Máximo 5 llamadas cada 10 segundos |
 
 ---
 
 ## Evidencia de ejecución
 
-Las evidencias se realizan a través de la colección Postman `bank-xyz.postman_collection.json` incluida en `docs/Postman/`.
-
-### 1. Levantar servicios con Docker Compose
-
-```bash
-docker-compose up --build
-```
+### 1. Contenedores levantados con Docker Compose
 
 ![Docker Compose](docs/images/evidencia_docker.png)
-![Docker Compose](docs/images/evidencia_docker1.png)
+![Docker Desktop](docs/images/evidencia_docker1.png)
 
 ---
 
-### 2. Ejecutar Jobs (batch en puerto 8080)
+### 2. Eureka — 3 microservicios registrados
 
-**Job 1 - Daily Transaction Report**
-
-![Job 1 ejecución](docs/images/evidencia_job1_ejecucion.png)
-![Job 1 consola](docs/images/evidencia_job1_consola.png)
-
-**Job 2 - Monthly Interest**
-
-![Job 2 ejecución](docs/images/evidencia_job2_ejecucion.png)
-![Job 2 consola](docs/images/evidencia_job2_consola.png)
-
-**Job 3 - Annual Statement**
-
-![Job 3 ejecución](docs/images/evidencia_job3_ejecucion.png)
-![Job 3 consola](docs/images/evidencia_job3_consola.png)
+![Eureka dashboard](docs/images/evidencia_eureka.png)
 
 ---
 
-### 3. Web BFF (puerto 8443, usuario: web_user)
+### 3. Jobs del batch ejecutados (BD poblada)
 
-![Web transacciones](docs/images/evidencia_web_transacciones.png)
-![Web resumen transacciones](docs/images/evidencia_web_resumen_transacciones.png)
-![Web cuentas](docs/images/evidencia_web_cuentas.png)
-![Web resumen cuentas](docs/images/evidencia_web_resumen_cuentas.png)
-![Web intereses](docs/images/evidencia_web_intereses.png)
+![Job transacciones diarias](docs/images/evidencia_job_transacciones.png)
+![Job transacciones diarias](docs/images/evidencia_job_transacciones1.png)
 
----
+![Job intereses mensuales](docs/images/evidencia_job_intereses.png)
+![Job intereses mensuales](docs/images/evidencia_job_intereses1.png)
 
-### 4. Mobile BFF (puerto 8443, usuario: mobile_user)
-
-![Mobile transacciones](docs/images/evidencia_mobile_transacciones.png)
-![Mobile resumen](docs/images/evidencia_mobile_resumen.png)
-![Mobile cuentas](docs/images/evidencia_mobile_cuentas.png)
-![Mobile intereses](docs/images/evidencia_mobile_intereses.png)
+![Job estados de cuenta](docs/images/evidencia_job_cuentas.png)
+![Job estados de cuenta](docs/images/evidencia_job_cuentas1.png)
 
 ---
 
-### 5. ATM BFF (puerto 8443, usuario: atm_user)
+### 4. Datos reales desde BD — endpoints GET
 
-![ATM saldo](docs/images/evidencia_atm_saldo.png)
-![ATM transacciones](docs/images/evidencia_atm_transacciones.png)
-![ATM resumen](docs/images/evidencia_atm_resumen.png)
-
----
-
-### 6. Verificación de seguridad — acceso con rol incorrecto (403)
-
-![403 Web con rol Mobile](docs/images/evidencia_403_web.png)
-![403 Mobile con rol ATM](docs/images/evidencia_403_mobile.png)
-![403 ATM con rol Web](docs/images/evidencia_403_atm.png)
+![ms-transacciones GET](docs/images/evidencia_transacciones_get.png)
+![ms-cuentas GET](docs/images/evidencia_cuentas_get.png)
+![ms-clientes GET](docs/images/evidencia_clientes_get.png)
 
 ---
 
-### 7. Tests de integración BFF
+### 5. Obtención de token JWT
 
-```bash
-cd bank-xyz-bff
-./mvnw test
-```
+![Token JWT](docs/images/evidencia_token.png)
 
-![Tests BFF resultado](docs/images/evidencia_tests_bff.png)
-![Tests BFF resultado](docs/images/evidencia_tests_bff1.png)
+---
+
+### 6. Resilience4j — Circuit Breaker / Rate Limiter
+
+![Resilience transacciones](docs/images/evidencia_resilience_transacciones.png)
+![Resilience cuentas](docs/images/evidencia_resilience_cuentas.png)
+![Resilience clientes](docs/images/evidencia_resilience_clientes.png)
+
+---
+
+### 7. Flujo Kafka — happy path
+
+![POST transacción](docs/images/evidencia_kafka_post.png)
+![Logs ms-cuentas / ms-clientes](docs/images/evidencia_kafka_log.png)
+
+---
+
+### 8. Flujo Kafka — compensación Saga
+
+![POST transacción rechazada](docs/images/evidencia_kafka_rechazo_post.png)
+![Logs ms-cuentas saldo insuficiente](docs/images/evidencia_kafka_rechazo.png)
