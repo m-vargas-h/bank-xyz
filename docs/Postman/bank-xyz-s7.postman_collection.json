@@ -1,0 +1,353 @@
+{
+  "info": {
+    "name": "bank-xyz S7 — Kafka + Resilience4j",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_token_url", "value": "http://localhost:9000" },
+    { "key": "base_batch_url", "value": "http://localhost:8080" },
+    { "key": "base_transacciones_url", "value": "http://localhost:8082" },
+    { "key": "base_cuentas_url", "value": "http://localhost:8081" },
+    { "key": "base_clientes_url", "value": "http://localhost:8083" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Auth — Obtener Token",
+      "item": [
+        {
+          "name": "Token transacciones.write",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.collectionVariables.set('token', json.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "bank-xyz-client" },
+                { "key": "password", "value": "secret123" }
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials" },
+                { "key": "scope", "value": "transacciones.write" }
+              ]
+            },
+            "url": { "raw": "{{base_token_url}}/oauth2/token", "host": ["{{base_token_url}}"], "path": ["oauth2", "token"] }
+          }
+        },
+        {
+          "name": "Token transacciones.read",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.collectionVariables.set('token', json.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "bank-xyz-client" },
+                { "key": "password", "value": "secret123" }
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials" },
+                { "key": "scope", "value": "transacciones.read" }
+              ]
+            },
+            "url": { "raw": "{{base_token_url}}/oauth2/token", "host": ["{{base_token_url}}"], "path": ["oauth2", "token"] }
+          }
+        },
+        {
+          "name": "Token cuentas.read",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.collectionVariables.set('token', json.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "bank-xyz-client" },
+                { "key": "password", "value": "secret123" }
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials" },
+                { "key": "scope", "value": "cuentas.read" }
+              ]
+            },
+            "url": { "raw": "{{base_token_url}}/oauth2/token", "host": ["{{base_token_url}}"], "path": ["oauth2", "token"] }
+          }
+        },
+        {
+          "name": "Token clientes.read",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.collectionVariables.set('token', json.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "bank-xyz-client" },
+                { "key": "password", "value": "secret123" }
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials" },
+                { "key": "scope", "value": "clientes.read" }
+              ]
+            },
+            "url": { "raw": "{{base_token_url}}/oauth2/token", "host": ["{{base_token_url}}"], "path": ["oauth2", "token"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Batch — Poblar BD",
+      "item": [
+        {
+          "name": "Job Transacciones Diarias",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_batch_url}}/jobs/daily-transaction", "host": ["{{base_batch_url}}"], "path": ["jobs", "daily-transaction"] }
+          }
+        },
+        {
+          "name": "Job Intereses Mensuales",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_batch_url}}/jobs/monthly-interest", "host": ["{{base_batch_url}}"], "path": ["jobs", "monthly-interest"] }
+          }
+        },
+        {
+          "name": "Job Estados de Cuenta Anuales",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_batch_url}}/jobs/annual-statement", "host": ["{{base_batch_url}}"], "path": ["jobs", "annual-statement"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. ms-transacciones",
+      "item": [
+        {
+          "name": "GET /api/transacciones (público)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_transacciones_url}}/api/transacciones", "host": ["{{base_transacciones_url}}"], "path": ["api", "transacciones"] }
+          }
+        },
+        {
+          "name": "GET /api/transacciones/info (público)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_transacciones_url}}/api/transacciones/info", "host": ["{{base_transacciones_url}}"], "path": ["api", "transacciones", "info"] }
+          }
+        },
+        {
+          "name": "POST /api/transacciones — Happy Path (requiere token write)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"monto\": 500000,\n    \"tipo\": \"Débito\"\n}"
+            },
+            "url": { "raw": "{{base_transacciones_url}}/api/transacciones", "host": ["{{base_transacciones_url}}"], "path": ["api", "transacciones"] }
+          }
+        },
+        {
+          "name": "POST /api/transacciones — Compensación Saga (monto > 2.000.000)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"monto\": 3000000,\n    \"tipo\": \"Débito\"\n}"
+            },
+            "url": { "raw": "{{base_transacciones_url}}/api/transacciones", "host": ["{{base_transacciones_url}}"], "path": ["api", "transacciones"] }
+          }
+        },
+        {
+          "name": "GET /api/transacciones/resilience (requiere token read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{base_transacciones_url}}/api/transacciones/resilience", "host": ["{{base_transacciones_url}}"], "path": ["api", "transacciones", "resilience"] }
+          }
+        },
+        {
+          "name": "GET /api/transacciones/ratelimit (requiere token read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{base_transacciones_url}}/api/transacciones/ratelimit", "host": ["{{base_transacciones_url}}"], "path": ["api", "transacciones", "ratelimit"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. ms-cuentas",
+      "item": [
+        {
+          "name": "GET /api/cuentas (público)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_cuentas_url}}/api/cuentas", "host": ["{{base_cuentas_url}}"], "path": ["api", "cuentas"] }
+          }
+        },
+        {
+          "name": "GET /api/cuentas/intereses (requiere token cuentas.read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{base_cuentas_url}}/api/cuentas/intereses", "host": ["{{base_cuentas_url}}"], "path": ["api", "cuentas", "intereses"] }
+          }
+        },
+        {
+          "name": "GET /api/cuentas/resumen (requiere token cuentas.read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{base_cuentas_url}}/api/cuentas/resumen", "host": ["{{base_cuentas_url}}"], "path": ["api", "cuentas", "resumen"] }
+          }
+        },
+        {
+          "name": "GET /api/cuentas/resilience (requiere token cuentas.read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{base_cuentas_url}}/api/cuentas/resilience", "host": ["{{base_cuentas_url}}"], "path": ["api", "cuentas", "resilience"] }
+          }
+        },
+        {
+          "name": "GET /api/cuentas/ratelimit (requiere token cuentas.read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{base_cuentas_url}}/api/cuentas/ratelimit", "host": ["{{base_cuentas_url}}"], "path": ["api", "cuentas", "ratelimit"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. ms-clientes",
+      "item": [
+        {
+          "name": "GET /api/clientes (público)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_clientes_url}}/api/clientes", "host": ["{{base_clientes_url}}"], "path": ["api", "clientes"] }
+          }
+        },
+        {
+          "name": "GET /api/clientes/intereses (requiere token clientes.read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{base_clientes_url}}/api/clientes/intereses", "host": ["{{base_clientes_url}}"], "path": ["api", "clientes", "intereses"] }
+          }
+        },
+        {
+          "name": "GET /api/clientes/resilience (requiere token clientes.read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{base_clientes_url}}/api/clientes/resilience", "host": ["{{base_clientes_url}}"], "path": ["api", "clientes", "resilience"] }
+          }
+        },
+        {
+          "name": "GET /api/clientes/ratelimit (requiere token clientes.read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{base_clientes_url}}/api/clientes/ratelimit", "host": ["{{base_clientes_url}}"], "path": ["api", "clientes", "ratelimit"] }
+          }
+        }
+      ]
+    }
+  ]
+}

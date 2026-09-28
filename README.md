@@ -75,7 +75,259 @@ ms-cuentas detecta saldo insuficiente
 ## Estructura del repositorio
 
 ```
-
+├── auth-server
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── auth_server
+│   │   │   │               ├── config
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               └── AuthServerApplication.java
+│   │   │   └── resources
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── auth_server
+│   │                       └── AuthServerApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── bank-xyz-batch
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── bank_xyz_batch
+│   │   │   │               ├── config
+│   │   │   │               │   ├── AnnualStatementJobConfig.java
+│   │   │   │               │   ├── DailyTransactionJobConfig.java
+│   │   │   │               │   └── MonthlyInterestJobConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── JobController.java
+│   │   │   │               ├── exception
+│   │   │   │               │   └── InvalidBankDataException.java
+│   │   │   │               ├── listener
+│   │   │   │               │   ├── BankSkipListener.java
+│   │   │   │               │   └── JobCompletionListener.java
+│   │   │   │               ├── model
+│   │   │   │               │   ├── CuentaAnual.java
+│   │   │   │               │   ├── CuentaAnualResumen.java
+│   │   │   │               │   ├── Interes.java
+│   │   │   │               │   ├── Transaccion.java
+│   │   │   │               │   └── TransaccionResumen.java
+│   │   │   │               ├── policy
+│   │   │   │               │   └── BankSkipPolicy.java
+│   │   │   │               ├── processor
+│   │   │   │               │   ├── CuentaAnualProcessor.java
+│   │   │   │               │   ├── InteresProcessor.java
+│   │   │   │               │   └── TransaccionProcessor.java
+│   │   │   │               ├── util
+│   │   │   │               │   └── DateParser.java
+│   │   │   │               ├── writer
+│   │   │   │               │   ├── CuentaAnualResumenWriter.java
+│   │   │   │               │   └── TransaccionResumenWriter.java
+│   │   │   │               └── BankXyzBatchApplication.java
+│   │   │   └── resources
+│   │   │       ├── application.properties
+│   │   │       ├── cuentas_anuales.csv
+│   │   │       ├── intereses.csv
+│   │   │       ├── schema.sql
+│   │   │       └── transacciones.csv
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── bank_xyz_batch
+│   │                       └── BankXyzBatchApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── config-server
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── config_server
+│   │   │   │               └── ConfigServerApplication.java
+│   │   │   └── resources
+│   │   │       ├── config-repo
+│   │   │       │   ├── ms-clientes.yaml
+│   │   │       │   ├── ms-cuentas.yaml
+│   │   │       │   └── ms-transacciones.yaml
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── config_server
+│   │                       └── ConfigServerApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── docs
+│   ├── Postman
+│   └── images
+├── eureka-server
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── eureka_server
+│   │   │   │               └── EurekaServerApplication.java
+│   │   │   └── resources
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── eureka_server
+│   │                       └── EurekaServerApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── ms-clientes
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── ms_clientes
+│   │   │   │               ├── config
+│   │   │   │               │   ├── KafkaConfig.java
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── ClientesController.java
+│   │   │   │               ├── events
+│   │   │   │               │   └── TransaccionEvento.java
+│   │   │   │               ├── services
+│   │   │   │               │   └── ClientesService.java
+│   │   │   │               └── MsClientesApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── ms_clientes
+│   │                       └── MsClientesApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── ms-cuentas
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── ms_cuentas
+│   │   │   │               ├── config
+│   │   │   │               │   ├── KafkaConfig.java
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── CuentasController.java
+│   │   │   │               ├── events
+│   │   │   │               │   └── TransaccionEvento.java
+│   │   │   │               ├── services
+│   │   │   │               │   └── CuentasService.java
+│   │   │   │               └── MsCuentasApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── ms_cuentas
+│   │                       └── MsCuentasApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── ms-transacciones
+│   ├── .mvn
+│   │   └── wrapper
+│   │       └── maven-wrapper.properties
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── duoc
+│   │   │   │           └── ms_transacciones
+│   │   │   │               ├── config
+│   │   │   │               │   ├── KafkaConfig.java
+│   │   │   │               │   └── SecurityConfig.java
+│   │   │   │               ├── controller
+│   │   │   │               │   └── TransaccionesController.java
+│   │   │   │               ├── events
+│   │   │   │               │   └── TransaccionEvento.java
+│   │   │   │               ├── services
+│   │   │   │               │   └── TransaccionesService.java
+│   │   │   │               └── MsTransaccionesApplication.java
+│   │   │   └── resources
+│   │   │       ├── static
+│   │   │       ├── templates
+│   │   │       └── application.yaml
+│   │   └── test
+│   │       └── java
+│   │           └── com
+│   │               └── duoc
+│   │                   └── ms_transacciones
+│   │                       └── MsTransaccionesApplicationTests.java
+│   ├── .gitattributes
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── .gitattributes
+├── .gitignore
+├── README.md
+└── docker-compose.yml
 ```
 
 ---
@@ -231,48 +483,60 @@ Todas las rutas protegidas requieren un token JWT obtenido desde el auth-server.
 
 ### 1. Contenedores levantados con Docker Compose
 
-![Docker Compose](docs/images/evidencia_docker_s7.png)
+![Docker Compose](docs/images/evidencia_docker.png)
+![Docker Desktop](docs/images/evidencia_docker1.png)
 
 ---
 
 ### 2. Eureka — 3 microservicios registrados
 
-![Eureka dashboard](docs/images/evidencia_eureka_s7.png)
+![Eureka dashboard](docs/images/evidencia_eureka.png)
 
 ---
 
 ### 3. Jobs del batch ejecutados (BD poblada)
 
-![Job transacciones diarias](docs/images/evidencia_job_transacciones_s7.png)
-![Job intereses mensuales](docs/images/evidencia_job_intereses_s7.png)
-![Job estados de cuenta](docs/images/evidencia_job_cuentas_s7.png)
+![Job transacciones diarias](docs/images/evidencia_job_transacciones.png)
+![Job transacciones diarias](docs/images/evidencia_job_transacciones1.png)
+
+![Job intereses mensuales](docs/images/evidencia_job_intereses.png)
+![Job intereses mensuales](docs/images/evidencia_job_intereses1.png)
+
+![Job estados de cuenta](docs/images/evidencia_job_cuentas.png)
+![Job estados de cuenta](docs/images/evidencia_job_cuentas1.png)
 
 ---
 
 ### 4. Datos reales desde BD — endpoints GET
 
-![ms-transacciones GET](docs/images/evidencia_transacciones_get_s7.png)
-![ms-cuentas GET](docs/images/evidencia_cuentas_get_s7.png)
-![ms-clientes GET](docs/images/evidencia_clientes_get_s7.png)
+![ms-transacciones GET](docs/images/evidencia_transacciones_get.png)
+![ms-cuentas GET](docs/images/evidencia_cuentas_get.png)
+![ms-clientes GET](docs/images/evidencia_clientes_get.png)
 
 ---
 
 ### 5. Obtención de token JWT
 
-![Token JWT](docs/images/evidencia_token_s7.png)
+![Token JWT](docs/images/evidencia_token.png)
 
 ---
 
-### 6. Flujo Kafka — happy path
+### 6. Resilience4j — Circuit Breaker / Rate Limiter
 
-![POST transacción](docs/images/evidencia_kafka_post_s7.png)
-![Logs ms-cuentas consume y publica](docs/images/evidencia_kafka_cuentas_log_s7.png)
-![Logs ms-clientes consume](docs/images/evidencia_kafka_clientes_log_s7.png)
+![Resilience transacciones](docs/images/evidencia_resilience_transacciones.png)
+![Resilience cuentas](docs/images/evidencia_resilience_cuentas.png)
+![Resilience clientes](docs/images/evidencia_resilience_clientes.png)
 
 ---
 
-### 7. Flujo Kafka — compensación Saga
+### 7. Flujo Kafka — happy path
 
-![POST transacción rechazada](docs/images/evidencia_kafka_rechazo_post_s7.png)
-![Logs ms-cuentas saldo insuficiente](docs/images/evidencia_kafka_rechazo_cuentas_s7.png)
-![Logs ms-transacciones compensación](docs/images/evidencia_kafka_compensacion_s7.png)
+![POST transacción](docs/images/evidencia_kafka_post.png)
+![Logs ms-cuentas / ms-clientes](docs/images/evidencia_kafka_log.png)
+
+---
+
+### 8. Flujo Kafka — compensación Saga
+
+![POST transacción rechazada](docs/images/evidencia_kafka_rechazo_post.png)
+![Logs ms-cuentas saldo insuficiente](docs/images/evidencia_kafka_rechazo.png)
