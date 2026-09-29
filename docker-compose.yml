@@ -24,6 +24,10 @@ services:
     container_name: bank-xyz-auth-server
     ports:
       - "9000:9000"
+    environment:
+      BANK_CLIENT_SECRET: ${BANK_CLIENT_SECRET:-secret123}
+      BANK_READONLY_SECRET: ${BANK_READONLY_SECRET:-readonly123}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
     depends_on:
       eureka-server:
         condition: service_started

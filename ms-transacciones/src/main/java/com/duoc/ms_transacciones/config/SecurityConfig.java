@@ -16,9 +16,10 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.GET, "/api/transacciones").permitAll()
+                .requestMatchers("/error").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/transacciones/**").hasAuthority("SCOPE_transacciones.read")
                 .requestMatchers(HttpMethod.POST, "/api/transacciones").hasAuthority("SCOPE_transacciones.write")
-                .requestMatchers("/api/transacciones/**").hasAuthority("SCOPE_transacciones.read")
+                .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
             .sessionManagement(session -> session

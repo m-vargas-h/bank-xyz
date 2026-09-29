@@ -2,6 +2,7 @@ package com.duoc.ms_cuentas.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -15,8 +16,9 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/cuentas").permitAll()
-                .requestMatchers("/api/cuentas/**").hasAuthority("SCOPE_cuentas.read")
+                .requestMatchers("/error").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/cuentas/**").hasAuthority("SCOPE_cuentas.read")
+                .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
             .sessionManagement(session -> session
