@@ -11,7 +11,7 @@ spring:
           bank-xyz-client:
             registration:
               client-id: bank-xyz-client
-              client-secret: "{noop}secret123"
+              client-secret: "{noop}${BANK_CLIENT_SECRET:secret123}"
               client-authentication-methods:
                 - client_secret_basic
               authorization-grant-types:
@@ -23,3 +23,15 @@ spring:
                 - transacciones.write
                 - clientes.read
                 - clientes.write
+          bank-xyz-readonly:
+            registration:
+              client-id: bank-xyz-readonly
+              client-secret: "{noop}${BANK_READONLY_SECRET:readonly123}"
+              client-authentication-methods:
+                - client_secret_basic
+              authorization-grant-types:
+                - client_credentials
+              scopes:
+                - cuentas.read
+                - transacciones.read
+                - clientes.read

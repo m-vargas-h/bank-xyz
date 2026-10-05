@@ -32,6 +32,8 @@ resilience4j:
         waitDuration: 1000
         enableExponentialBackoff: true
         exponentialBackoffMultiplier: 2
+        ignoreExceptions:
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
   timelimiter:
     instances:
       cuentasService:

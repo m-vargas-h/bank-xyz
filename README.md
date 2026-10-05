@@ -1,6 +1,13 @@
-# Bank XYZ — Tolerancia a Fallos y Arquitectura de Eventos con Kafka
+# Bank XYZ — Microservicios resilientes y seguros en la nube
 
-Extensión de la arquitectura de microservicios bancarios incorporando comunicación asíncrona mediante Apache Kafka bajo el Patrón Saga con Coreografía, integración con base de datos MySQL poblada por Spring Batch, y tolerancia a fallos con Resilience4j.
+Arquitectura de microservicios bancarios preparada para un entorno cloud: autenticación y autorización con **OAuth2/JWT**, despliegue con **Docker y Docker Compose**, tolerancia a fallos con **Resilience4j** y comunicación asíncrona con **Apache Kafka** (Patrón Saga con coreografía). Los datos provienen de `bank_legacy_data` y son cargados en MySQL por Spring Batch.
+
+**Objetivos:**
+
+- Proteger el acceso a los microservicios con un servidor de autorización OAuth2 y control por scopes.
+- Empaquetar cada servicio en una imagen Docker y orquestarlos con un único `docker-compose.yml`.
+- Aplicar patrones de resiliencia (Circuit Breaker, Retry, TimeLimiter, Rate Limiter y fallbacks).
+- Mantener la consistencia entre servicios mediante eventos Kafka, con compensación ante fallos.
 
 ---
 
@@ -52,6 +59,8 @@ ms-cuentas detecta saldo insuficiente
     → ms-transacciones consume → actualiza estado → FALLIDA
 ```
 
+La respuesta HTTP del `POST /api/transacciones` es siempre `PENDIENTE`; el resultado de la Saga se observa en los logs de los microservicios.
+
 ---
 
 ## Arquitectura general
@@ -69,6 +78,22 @@ ms-cuentas detecta saldo insuficiente
         ↕ eventos asincrónicos
 [Kafka :9092] ← [Zookeeper :2181]
 ```
+
+---
+
+## Propuesta técnica
+
+| Decisión | Justificación |
+|---|---|
+| OAuth2 con `client_credentials` y scopes por recurso (`*.read`, `*.write`) | Comunicación entre sistemas sin usuario final; el scope limita lo que puede hacer cada cliente |
+| Segundo cliente `bank-xyz-readonly` solo con scopes de lectura | Mínimo privilegio: puede consultar, pero no registrar transacciones |
+| Todas las rutas `/api/**` protegidas | Los datos bancarios no se exponen sin token; cada microservicio valida el JWT como Resource Server |
+| Credenciales por variables de entorno (`.env`) | Los secretos no quedan fijos en el código ni en el compose |
+| Una imagen Docker por servicio | Portabilidad: cada servicio se despliega igual en cualquier entorno |
+| Compose con healthchecks y `depends_on: service_healthy` | Orden de arranque garantizado: config → eureka → auth → microservicios |
+| `restart: unless-stopped` | Recuperación automática ante la caída de un contenedor |
+| Resilience4j sobre las consultas a BD, con fallback | Si MySQL cae, el servicio responde de forma controlada en lugar de quedar esperando 30 s |
+| Saga por coreografía en Kafka | Sin orquestador central; cada servicio reacciona a eventos y compensa si falla |
 
 ---
 
@@ -228,6 +253,7 @@ ms-cuentas detecta saldo insuficiente
 │   │   │   │           └── ms_clientes
 │   │   │   │               ├── config
 │   │   │   │               │   ├── KafkaConfig.java
+│   │   │   │               │   ├── RateLimitExceptionHandler.java
 │   │   │   │               │   └── SecurityConfig.java
 │   │   │   │               ├── controller
 │   │   │   │               │   └── ClientesController.java
@@ -237,8 +263,6 @@ ms-cuentas detecta saldo insuficiente
 │   │   │   │               │   └── ClientesService.java
 │   │   │   │               └── MsClientesApplication.java
 │   │   │   └── resources
-│   │   │       ├── static
-│   │   │       ├── templates
 │   │   │       └── application.yaml
 │   │   └── test
 │   │       └── java
@@ -264,6 +288,7 @@ ms-cuentas detecta saldo insuficiente
 │   │   │   │           └── ms_cuentas
 │   │   │   │               ├── config
 │   │   │   │               │   ├── KafkaConfig.java
+│   │   │   │               │   ├── RateLimitExceptionHandler.java
 │   │   │   │               │   └── SecurityConfig.java
 │   │   │   │               ├── controller
 │   │   │   │               │   └── CuentasController.java
@@ -273,8 +298,6 @@ ms-cuentas detecta saldo insuficiente
 │   │   │   │               │   └── CuentasService.java
 │   │   │   │               └── MsCuentasApplication.java
 │   │   │   └── resources
-│   │   │       ├── static
-│   │   │       ├── templates
 │   │   │       └── application.yaml
 │   │   └── test
 │   │       └── java
@@ -300,6 +323,7 @@ ms-cuentas detecta saldo insuficiente
 │   │   │   │           └── ms_transacciones
 │   │   │   │               ├── config
 │   │   │   │               │   ├── KafkaConfig.java
+│   │   │   │               │   ├── RateLimitExceptionHandler.java
 │   │   │   │               │   └── SecurityConfig.java
 │   │   │   │               ├── controller
 │   │   │   │               │   └── TransaccionesController.java
@@ -309,8 +333,6 @@ ms-cuentas detecta saldo insuficiente
 │   │   │   │               │   └── TransaccionesService.java
 │   │   │   │               └── MsTransaccionesApplication.java
 │   │   │   └── resources
-│   │   │       ├── static
-│   │   │       ├── templates
 │   │   │       └── application.yaml
 │   │   └── test
 │   │       └── java
@@ -324,6 +346,7 @@ ms-cuentas detecta saldo insuficiente
 │   ├── mvnw
 │   ├── mvnw.cmd
 │   └── pom.xml
+├── .env.example
 ├── .gitattributes
 ├── .gitignore
 ├── README.md
@@ -340,7 +363,7 @@ ms-cuentas detecta saldo insuficiente
 - Spring Kafka 3.3.6 / Apache Kafka 3.9.1
 - Spring Security OAuth2 Authorization Server
 - Spring Security OAuth2 Resource Server
-- Resilience4j (Circuit Breaker, Retry, TimeLimiter, RateLimiter)
+- Resilience4j (Circuit Breaker, Retry, TimeLimiter, RateLimiter) con Spring Boot AOP
 - Netflix Eureka
 - Spring Cloud Config
 - MySQL 8.0
@@ -360,7 +383,25 @@ ms-cuentas detecta saldo insuficiente
 
 ## Configuración y ejecución
 
+### Variables de entorno (opcional)
+
+El compose incluye valores por defecto. Solo es necesario crear el `.env` para cambiar credenciales:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Valor por defecto | Uso |
+|---|---|---|
+| `MYSQL_ROOT_PASSWORD` | `root` | Contraseña de MySQL |
+| `MYSQL_DATABASE` | `bank_xyz` | Nombre de la base de datos |
+| `BANK_CLIENT_SECRET` | `secret123` | Secret del cliente `bank-xyz-client` |
+| `BANK_READONLY_SECRET` | `readonly123` | Secret del cliente `bank-xyz-readonly` |
+| `ADMIN_PASSWORD` | `admin123` | Contraseña del usuario `admin` del auth-server |
+
 ### Compilar todos los proyectos
+
+Los Dockerfile copian el `.jar` generado en `target/`, por lo que se debe compilar antes de construir las imágenes.
 
 ```bash
 cd config-server
@@ -383,15 +424,29 @@ cd ..
 ### Levantar todos los servicios
 
 ```bash
-docker-compose up --build
+docker compose up -d --build
+docker compose ps
 ```
 
-### Poblar la base de datos (ejecutar tras el primer levantamiento)
+Esperar a que config-server, eureka-server, auth-server, mysql y kafka estén `healthy` y a que los tres microservicios aparezcan registrados en Eureka.
+
+### Poblar la base de datos (primer levantamiento o tras `docker compose down -v`)
 
 ```bash
 POST http://localhost:8080/jobs/daily-transaction
 POST http://localhost:8080/jobs/monthly-interest
 POST http://localhost:8080/jobs/annual-statement
+```
+
+### Pruebas con Postman
+
+Importar `docs/Postman/bank-xyz-s8.postman_collection.json`. Ejecutar la carpeta **1 Tokens** antes de cada grupo de pruebas, ya que los tokens expiran a los 5 minutos.
+
+### Detener los servicios
+
+```bash
+docker compose down        # conserva la base de datos
+docker compose down -v     # elimina también el volumen de MySQL
 ```
 
 ### Servicios disponibles
@@ -410,9 +465,18 @@ POST http://localhost:8080/jobs/annual-statement
 
 ---
 
+## Docker y orquestación
+
+- **Imágenes:** se construyen 7 (config-server, eureka-server, auth-server, bank-xyz-batch, ms-cuentas, ms-transacciones, ms-clientes); MySQL, Zookeeper y Kafka usan imágenes oficiales.
+- **Healthchecks:** config-server (`/application/default`), eureka-server (`/`), auth-server (`/oauth2/jwks`), MySQL (`mysqladmin ping`) y Kafka (`kafka-broker-api-versions`).
+- **Orden de arranque:** `config-server → eureka-server → auth-server → ms-cuentas / ms-transacciones / ms-clientes`. Los microservicios esperan además a Kafka y MySQL.
+- **Reinicio:** `restart: unless-stopped` en todos los servicios.
+
+---
+
 ## Autenticación OAuth2
 
-Todas las rutas protegidas requieren un token JWT obtenido desde el auth-server.
+Todas las rutas `/api/**` requieren un token JWT (RS256, duración de 5 minutos) obtenido desde el auth-server con el flujo `client_credentials`.
 
 **Obtener token:**
 
@@ -420,10 +484,23 @@ Todas las rutas protegidas requieren un token JWT obtenido desde el auth-server.
 |---|---|
 | URL | `POST http://localhost:9000/oauth2/token` |
 | Auth | Basic Auth |
-| client_id | `bank-xyz-client` |
-| client_secret | `secret123` |
 | grant_type | `client_credentials` |
-| scope | `transacciones.write` / `transacciones.read` / `cuentas.read` / `clientes.read` |
+| scope | Uno de los scopes permitidos para el cliente |
+
+**Clientes registrados:**
+
+| Cliente | Secret por defecto | Scopes permitidos |
+|---|---|---|
+| `bank-xyz-client` | `secret123` | `cuentas.read`, `cuentas.write`, `clientes.read`, `clientes.write`, `transacciones.read`, `transacciones.write` |
+| `bank-xyz-readonly` | `readonly123` | `cuentas.read`, `clientes.read`, `transacciones.read` |
+
+**Respuestas de seguridad:**
+
+| Código | Situación |
+|---|---|
+| 401 | Petición sin token, o token inválido o vencido |
+| 403 | Token válido, pero sin el scope requerido por el endpoint |
+| 400 `invalid_scope` | El cliente solicita un scope que no tiene asignado |
 
 ---
 
@@ -441,9 +518,9 @@ Todas las rutas protegidas requieren un token JWT obtenido desde el auth-server.
 
 | Endpoint | Método | Acceso | Descripción |
 |---|---|---|---|
-| `/api/transacciones` | GET | Público | Lista transacciones desde BD |
+| `/api/transacciones` | GET | JWT `transacciones.read` | Lista transacciones desde BD |
 | `/api/transacciones` | POST | JWT `transacciones.write` | Registra transacción y publica evento Kafka |
-| `/api/transacciones/info` | GET | Público | Info del microservicio |
+| `/api/transacciones/info` | GET | JWT `transacciones.read` | Info del microservicio |
 | `/api/transacciones/resilience` | GET | JWT `transacciones.read` | Circuit Breaker + Retry + TimeLimiter |
 | `/api/transacciones/ratelimit` | GET | JWT `transacciones.read` | Rate Limiter |
 
@@ -451,9 +528,9 @@ Todas las rutas protegidas requieren un token JWT obtenido desde el auth-server.
 
 | Endpoint | Método | Acceso | Descripción |
 |---|---|---|---|
-| `/api/cuentas` | GET | Público | Lista cuentas anuales desde BD |
-| `/api/cuentas/intereses` | GET | Público | Lista intereses desde BD |
-| `/api/cuentas/resumen` | GET | Público | Resumen de cuentas desde BD |
+| `/api/cuentas` | GET | JWT `cuentas.read` | Lista cuentas anuales desde BD |
+| `/api/cuentas/intereses` | GET | JWT `cuentas.read` | Lista intereses desde BD |
+| `/api/cuentas/resumen` | GET | JWT `cuentas.read` | Resumen de cuentas desde BD |
 | `/api/cuentas/resilience` | GET | JWT `cuentas.read` | Circuit Breaker + Retry + TimeLimiter |
 | `/api/cuentas/ratelimit` | GET | JWT `cuentas.read` | Rate Limiter |
 
@@ -461,8 +538,8 @@ Todas las rutas protegidas requieren un token JWT obtenido desde el auth-server.
 
 | Endpoint | Método | Acceso | Descripción |
 |---|---|---|---|
-| `/api/clientes` | GET | Público | Lista clientes desde BD |
-| `/api/clientes/intereses` | GET | Público | Lista intereses por cliente desde BD |
+| `/api/clientes` | GET | JWT `clientes.read` | Lista clientes desde BD |
+| `/api/clientes/intereses` | GET | JWT `clientes.read` | Lista intereses por cliente desde BD |
 | `/api/clientes/resilience` | GET | JWT `clientes.read` | Circuit Breaker + Retry + TimeLimiter |
 | `/api/clientes/ratelimit` | GET | JWT `clientes.read` | Rate Limiter |
 
@@ -472,10 +549,16 @@ Todas las rutas protegidas requieren un token JWT obtenido desde el auth-server.
 
 | Patrón | Configuración |
 |---|---|
-| Circuit Breaker | Se abre con 50% de fallos en ventana de 10 llamadas; espera 10s en estado OPEN |
-| Retry | 3 intentos con backoff exponencial (x2) cada 1s |
-| Time Limiter | Timeout de 2 segundos por llamada |
-| Rate Limiter | Máximo 5 llamadas cada 10 segundos |
+| Circuit Breaker | Ventana de 10 llamadas (mínimo 5); se abre con 50% de fallos; 10 s en estado OPEN; 3 llamadas de prueba en HALF_OPEN |
+| Retry | 3 intentos con backoff exponencial (x2) desde 1 s; no reintenta `CallNotPermittedException` |
+| Time Limiter | Timeout de 2 segundos por intento |
+| Rate Limiter | Máximo 5 llamadas cada 10 segundos; el exceso responde **429** (`RateLimitExceptionHandler`) |
+| Fallback | Respuesta controlada `{"error":"Servicio no disponible","detalle":...}` |
+
+Notas de implementación:
+
+- Las anotaciones de Resilience4j requieren `spring-boot-starter-aop`; sin esa dependencia Spring las ignora silenciosamente.
+- El `fallbackMethod` se declara en `@Retry` (la capa más externa). Si estuviera en `@CircuitBreaker`, el fallback ocultaría el error y el Retry nunca reintentaría.
 
 ---
 
@@ -483,60 +566,62 @@ Todas las rutas protegidas requieren un token JWT obtenido desde el auth-server.
 
 ### 1. Contenedores levantados con Docker Compose
 
-![Docker Compose](docs/images/evidencia_docker.png)
-![Docker Desktop](docs/images/evidencia_docker1.png)
+![Docker Compose](docs/evidencias/01_compose_ps.png)
 
 ---
 
 ### 2. Eureka — 3 microservicios registrados
 
-![Eureka dashboard](docs/images/evidencia_eureka.png)
+![Eureka dashboard](docs/evidencias/02_eureka.png)
 
 ---
 
-### 3. Jobs del batch ejecutados (BD poblada)
+### 3. Obtención de tokens JWT
 
-![Job transacciones diarias](docs/images/evidencia_job_transacciones.png)
-![Job transacciones diarias](docs/images/evidencia_job_transacciones1.png)
-
-![Job intereses mensuales](docs/images/evidencia_job_intereses.png)
-![Job intereses mensuales](docs/images/evidencia_job_intereses1.png)
-
-![Job estados de cuenta](docs/images/evidencia_job_cuentas.png)
-![Job estados de cuenta](docs/images/evidencia_job_cuentas1.png)
+![Tokens](docs/evidencias/03_tokens.png)
 
 ---
 
-### 4. Datos reales desde BD — endpoints GET
+### 4. Seguridad OAuth2 — 401, 403 e `invalid_scope`
 
-![ms-transacciones GET](docs/images/evidencia_transacciones_get.png)
-![ms-cuentas GET](docs/images/evidencia_cuentas_get.png)
-![ms-clientes GET](docs/images/evidencia_clientes_get.png)
-
----
-
-### 5. Obtención de token JWT
-
-![Token JWT](docs/images/evidencia_token.png)
+![Pruebas de seguridad](docs/evidencias/04_seguridad.png)
+![Detalle de respuestas](docs/evidencias/04b_seguridad_detalle.png)
 
 ---
 
-### 6. Resilience4j — Circuit Breaker / Rate Limiter
+### 5. Resilience4j — Rate Limiter
 
-![Resilience transacciones](docs/images/evidencia_resilience_transacciones.png)
-![Resilience cuentas](docs/images/evidencia_resilience_cuentas.png)
-![Resilience clientes](docs/images/evidencia_resilience_clientes.png)
+![Rate Limiter](docs/evidencias/05_ratelimit.png)
+![Rate Limiter](docs/evidencias/05_ratelimit_1.png)
+
+---
+
+### 6. Resilience4j — Circuit Breaker, Retry, TimeLimiter y Fallback
+
+**Funcionamiento normal:**
+
+![Resiliencia normal](docs/evidencias/06_resiliencia_normal.png)
+
+**Con MySQL detenido:**
+
+![MySQL detenido](docs/evidencias/07a_mysql_detenido.png)
+![Resiliencia con fallos](docs/evidencias/07b_resiliencia_fallo.png)
+![Detalle del fallback](docs/evidencias/07c_resiliencia_detalle.png)
+
+**Recuperación al levantar MySQL:**
+
+![Recuperación](docs/evidencias/08_recuperacion.png)
 
 ---
 
 ### 7. Flujo Kafka — happy path
 
-![POST transacción](docs/images/evidencia_kafka_post.png)
-![Logs ms-cuentas / ms-clientes](docs/images/evidencia_kafka_log.png)
+![POST transacción](docs/evidencias/09_saga_ok_post.png)
+![Logs happy path](docs/evidencias/10_saga_ok_logs.png)
 
 ---
 
 ### 8. Flujo Kafka — compensación Saga
 
-![POST transacción rechazada](docs/images/evidencia_kafka_rechazo_post.png)
-![Logs ms-cuentas saldo insuficiente](docs/images/evidencia_kafka_rechazo.png)
+![POST transacción rechazada](docs/evidencias/11_saga_rechazo_post.png)
+![Logs saldo insuficiente](docs/evidencias/12_saga_rechazo_logs.png)

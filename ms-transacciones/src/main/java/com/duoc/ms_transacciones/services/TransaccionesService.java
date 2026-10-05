@@ -32,8 +32,8 @@ public class TransaccionesService {
         return jdbc.queryForList("SELECT * FROM transaccion_reporte");
     }
 
-    @CircuitBreaker(name = "transaccionesService", fallbackMethod = "fallbackResiliencia")
-    @Retry(name = "transaccionesService")
+    @CircuitBreaker(name = "transaccionesService")
+    @Retry(name = "transaccionesService", fallbackMethod = "fallbackResiliencia")
     @TimeLimiter(name = "transaccionesService")
     public CompletableFuture<List<Map<String, Object>>> getTransaccionesConResiliencia() {
         return CompletableFuture.supplyAsync(() ->
