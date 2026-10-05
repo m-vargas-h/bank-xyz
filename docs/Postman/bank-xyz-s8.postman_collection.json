@@ -1,0 +1,755 @@
+{
+  "info": {
+    "name": "bank-xyz S8",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_token_url",
+      "value": "http://localhost:9000"
+    },
+    {
+      "key": "base_batch_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "base_trx_url",
+      "value": "http://localhost:8082"
+    },
+    {
+      "key": "base_cuentas_url",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "base_clientes_url",
+      "value": "http://localhost:8083"
+    },
+    {
+      "key": "token_cuentas",
+      "value": ""
+    },
+    {
+      "key": "token_clientes",
+      "value": ""
+    },
+    {
+      "key": "token_trx_read",
+      "value": ""
+    },
+    {
+      "key": "token_trx_write",
+      "value": ""
+    },
+    {
+      "key": "token_readonly",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0 Jobs",
+      "item": [
+        {
+          "name": "Job diario",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_batch_url}}/jobs/daily-transaction",
+              "host": [
+                "{{base_batch_url}}"
+              ],
+              "path": [
+                "jobs",
+                "daily-transaction"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Job intereses",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_batch_url}}/jobs/monthly-interest",
+              "host": [
+                "{{base_batch_url}}"
+              ],
+              "path": [
+                "jobs",
+                "monthly-interest"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Job anual",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_batch_url}}/jobs/annual-statement",
+              "host": [
+                "{{base_batch_url}}"
+              ],
+              "path": [
+                "jobs",
+                "annual-statement"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 Tokens",
+      "item": [
+        {
+          "name": "Token cuentas",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "bank-xyz-client"
+                },
+                {
+                  "key": "password",
+                  "value": "secret123"
+                }
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "scope",
+                  "value": "cuentas.read"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_token_url}}/oauth2/token",
+              "host": [
+                "{{base_token_url}}"
+              ],
+              "path": [
+                "oauth2",
+                "token"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('token_cuentas', pm.response.json().access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token clientes",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "bank-xyz-client"
+                },
+                {
+                  "key": "password",
+                  "value": "secret123"
+                }
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "scope",
+                  "value": "clientes.read"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_token_url}}/oauth2/token",
+              "host": [
+                "{{base_token_url}}"
+              ],
+              "path": [
+                "oauth2",
+                "token"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('token_clientes', pm.response.json().access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token trx read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "bank-xyz-client"
+                },
+                {
+                  "key": "password",
+                  "value": "secret123"
+                }
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "scope",
+                  "value": "transacciones.read"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_token_url}}/oauth2/token",
+              "host": [
+                "{{base_token_url}}"
+              ],
+              "path": [
+                "oauth2",
+                "token"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('token_trx_read', pm.response.json().access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token trx write",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "bank-xyz-client"
+                },
+                {
+                  "key": "password",
+                  "value": "secret123"
+                }
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "scope",
+                  "value": "transacciones.write"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_token_url}}/oauth2/token",
+              "host": [
+                "{{base_token_url}}"
+              ],
+              "path": [
+                "oauth2",
+                "token"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('token_trx_write', pm.response.json().access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token readonly",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "bank-xyz-readonly"
+                },
+                {
+                  "key": "password",
+                  "value": "readonly123"
+                }
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "scope",
+                  "value": "cuentas.read"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_token_url}}/oauth2/token",
+              "host": [
+                "{{base_token_url}}"
+              ],
+              "path": [
+                "oauth2",
+                "token"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('token_readonly', pm.response.json().access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Seguridad",
+      "item": [
+        {
+          "name": "S1 sin token 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_cuentas_url}}/api/cuentas",
+              "host": [
+                "{{base_cuentas_url}}"
+              ],
+              "path": [
+                "api",
+                "cuentas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "S2 con token 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cuentas}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_cuentas_url}}/api/cuentas",
+              "host": [
+                "{{base_cuentas_url}}"
+              ],
+              "path": [
+                "api",
+                "cuentas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "S3 token de otro ms 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cuentas}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_clientes_url}}/api/clientes",
+              "host": [
+                "{{base_clientes_url}}"
+              ],
+              "path": [
+                "api",
+                "clientes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "S4 POST con token read 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_trx_read}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"monto\": 1000,\n    \"tipo\": \"D\u00e9bito\"\n}"
+            },
+            "url": {
+              "raw": "{{base_trx_url}}/api/transacciones",
+              "host": [
+                "{{base_trx_url}}"
+              ],
+              "path": [
+                "api",
+                "transacciones"
+              ]
+            }
+          }
+        },
+        {
+          "name": "S5 readonly pide write 400",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "bank-xyz-readonly"
+                },
+                {
+                  "key": "password",
+                  "value": "readonly123"
+                }
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "scope",
+                  "value": "transacciones.write"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_token_url}}/oauth2/token",
+              "host": [
+                "{{base_token_url}}"
+              ],
+              "path": [
+                "oauth2",
+                "token"
+              ]
+            }
+          }
+        },
+        {
+          "name": "S6 readonly lee 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_readonly}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_cuentas_url}}/api/cuentas",
+              "host": [
+                "{{base_cuentas_url}}"
+              ],
+              "path": [
+                "api",
+                "cuentas"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 RateLimit",
+      "item": [
+        {
+          "name": "RL cuentas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cuentas}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_cuentas_url}}/api/cuentas/ratelimit",
+              "host": [
+                "{{base_cuentas_url}}"
+              ],
+              "path": [
+                "api",
+                "cuentas",
+                "ratelimit"
+              ]
+            }
+          }
+        },
+        {
+          "name": "RL trx",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_trx_read}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_trx_url}}/api/transacciones/ratelimit",
+              "host": [
+                "{{base_trx_url}}"
+              ],
+              "path": [
+                "api",
+                "transacciones",
+                "ratelimit"
+              ]
+            }
+          }
+        },
+        {
+          "name": "RL clientes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_clientes}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_clientes_url}}/api/clientes/ratelimit",
+              "host": [
+                "{{base_clientes_url}}"
+              ],
+              "path": [
+                "api",
+                "clientes",
+                "ratelimit"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 Resiliencia",
+      "item": [
+        {
+          "name": "R cuentas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cuentas}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_cuentas_url}}/api/cuentas/resilience",
+              "host": [
+                "{{base_cuentas_url}}"
+              ],
+              "path": [
+                "api",
+                "cuentas",
+                "resilience"
+              ]
+            }
+          }
+        },
+        {
+          "name": "R trx",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_trx_read}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_trx_url}}/api/transacciones/resilience",
+              "host": [
+                "{{base_trx_url}}"
+              ],
+              "path": [
+                "api",
+                "transacciones",
+                "resilience"
+              ]
+            }
+          }
+        },
+        {
+          "name": "R clientes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_clientes}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_clientes_url}}/api/clientes/resilience",
+              "host": [
+                "{{base_clientes_url}}"
+              ],
+              "path": [
+                "api",
+                "clientes",
+                "resilience"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 Saga",
+      "item": [
+        {
+          "name": "Saga ok",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_trx_write}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"monto\": 500000,\n    \"tipo\": \"D\u00e9bito\"\n}"
+            },
+            "url": {
+              "raw": "{{base_trx_url}}/api/transacciones",
+              "host": [
+                "{{base_trx_url}}"
+              ],
+              "path": [
+                "api",
+                "transacciones"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Saga rechazo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_trx_write}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"monto\": 3000000,\n    \"tipo\": \"D\u00e9bito\"\n}"
+            },
+            "url": {
+              "raw": "{{base_trx_url}}/api/transacciones",
+              "host": [
+                "{{base_trx_url}}"
+              ],
+              "path": [
+                "api",
+                "transacciones"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
