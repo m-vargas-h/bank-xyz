@@ -132,6 +132,27 @@ services:
       retries: 10
       start_period: 30s
 
+  bff:
+    build: ./bank-xyz-bff
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      AUTH_TOKEN_URI: http://auth-server:9000/oauth2/token
+      BANK_READONLY_SECRET: ${BANK_READONLY_SECRET:-readonly123}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      auth-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fk https://localhost:8443/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+      
   ms-cuentas:
     build: ./ms-cuentas
     container_name: bank-xyz-ms-cuentas

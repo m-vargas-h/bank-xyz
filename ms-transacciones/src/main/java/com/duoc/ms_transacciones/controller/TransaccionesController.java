@@ -29,6 +29,11 @@ public class TransaccionesController {
         return transaccionesService.listarTransacciones();
     }
 
+    @GetMapping("/resumen")
+    public Map<String, Object> getResumen() {
+        return transaccionesService.getResumen();
+    }
+
     @GetMapping("/info")
     public Map<String, String> info() {
         return Map.of("servicio", descripcion, "status", "UP");

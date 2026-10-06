@@ -32,6 +32,13 @@ public class TransaccionesService {
         return jdbc.queryForList("SELECT * FROM transaccion_reporte");
     }
 
+    public Map<String, Object> getResumen() {
+        return jdbc.queryForMap(
+            "SELECT COALESCE(SUM(total_procesadas),0) AS total_procesadas, " +
+            "COALESCE(SUM(monto_total),0) AS monto_total, " +
+            "COALESCE(SUM(total_anomalias),0) AS total_anomalias FROM transaccion_resumen");
+    }
+
     @CircuitBreaker(name = "transaccionesService")
     @Retry(name = "transaccionesService", fallbackMethod = "fallbackResiliencia")
     @TimeLimiter(name = "transaccionesService")

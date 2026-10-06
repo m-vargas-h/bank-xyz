@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: bank-xyz-bff
+  security:
+    oauth2:
+      client:
+        provider:
+          bank-auth:
+            token-uri: ${AUTH_TOKEN_URI:http://localhost:9000/oauth2/token}
+        registration:
+          bff-read:
+            provider: bank-auth
+            client-id: bank-xyz-readonly
+            client-secret: ${BANK_READONLY_SECRET:readonly123}
+            authorization-grant-type: client_credentials
+            client-authentication-method: client_secret_basic
+            scope: cuentas.read,transacciones.read,clientes.read
+
+server:
+  port: 8443
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-type: PKCS12
+    key-store-password: ${SSL_KEYSTORE_PASSWORD:bankxyz2024}
+    key-alias: bank-xyz-bff
+
+bff:
+  security:
+    web:    { user: "${BFF_WEB_USER:web_user}",       password: "${BFF_WEB_PASSWORD:web_pass_2024}" }
+    mobile: { user: "${BFF_MOBILE_USER:mobile_user}", password: "${BFF_MOBILE_PASSWORD:mobile_pass_2024}" }
+    atm:    { user: "${BFF_ATM_USER:atm_user}",       password: "${BFF_ATM_PASSWORD:atm_pass_2024}" }
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    secure-port-enabled: true
+    non-secure-port-enabled: false
+    secure-port: 8443
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      ms:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+  retry:
+    instances:
+      ms:
+        maxAttempts: 2
+        waitDuration: 500ms
+        ignoreExceptions:
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+          - org.springframework.web.client.HttpClientErrorException
