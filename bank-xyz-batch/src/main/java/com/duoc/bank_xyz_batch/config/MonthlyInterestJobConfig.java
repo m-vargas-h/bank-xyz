@@ -5,9 +5,12 @@ import com.duoc.bank_xyz_batch.listener.JobCompletionListener;
 import com.duoc.bank_xyz_batch.model.Interes;
 import com.duoc.bank_xyz_batch.policy.BankSkipPolicy;
 import com.duoc.bank_xyz_batch.processor.InteresProcessor;
+import com.duoc.bank_xyz_batch.tasklet.LimpiezaTasklet;
+
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.SkipListener;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.JobScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
@@ -21,21 +24,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.task.TaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.retry.backoff.ExponentialBackOffPolicy;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
 
 @Configuration
 public class MonthlyInterestJobConfig {
-
-    @Value("${batch.thread-pool-size}")
-    private int threadPoolSize;
-
-    @Value("${batch.chunk-size}")
-    private int chunkSize;
 
     @Bean
     public FlatFileItemReader<Interes> interesReader() {
@@ -46,6 +43,14 @@ public class MonthlyInterestJobConfig {
                 .names("cuentaId", "nombre", "saldo", "edad", "tipo")
                 .linesToSkip(1)
                 .targetType(Interes.class)
+                .saveState(false)
+                .build();
+    }
+
+    @Bean
+    public SynchronizedItemStreamReader<Interes> synchronizedInteresReader() {
+        return new SynchronizedItemStreamReaderBuilder<Interes>()
+                .delegate(interesReader())
                 .build();
     }
 
@@ -60,20 +65,35 @@ public class MonthlyInterestJobConfig {
     }
 
     @Bean
+    public Step monthlyInterestLimpiezaStep(JobRepository jobRepository,
+                                            PlatformTransactionManager transactionManager,
+                                            JdbcTemplate jdbcTemplate) {
+        return new StepBuilder("monthlyInterestLimpiezaStep", jobRepository)
+                .tasklet(new LimpiezaTasklet(jdbcTemplate, "interes_reporte"), transactionManager)
+                .build();
+    }
+
+    @Bean
+    @JobScope
     public Step monthlyInterestStep(JobRepository jobRepository,
                                     PlatformTransactionManager transactionManager,
                                     SynchronizedItemStreamReader<Interes> synchronizedInteresReader,
                                     InteresProcessor interesProcessor,
                                     JdbcBatchItemWriter<Interes> interesWriter,
-                                    TaskExecutor monthlyInterestTaskExecutor,
                                     BankSkipPolicy bankSkipPolicy,
-                                    BankSkipListener<Interes, Interes> bankSkipListener) {
+                                    BankSkipListener<Interes, Interes> bankSkipListener,
+                                    @Value("#{jobParameters['threads']}") Long threads,
+                                    @Value("#{jobParameters['chunkSize']}") Long chunkSize) {
+        SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor("monthly-batch-");
+        executor.setConcurrencyLimit(threads.intValue());
+
         return new StepBuilder("monthlyInterestStep", jobRepository)
-                .<Interes, Interes>chunk(chunkSize, transactionManager)
+                .<Interes, Interes>chunk(chunkSize.intValue(), transactionManager)
                 .reader(synchronizedInteresReader)
                 .processor(interesProcessor)
                 .writer(interesWriter)
-                .taskExecutor(monthlyInterestTaskExecutor)
+                .taskExecutor(executor)
+                .throttleLimit(threads.intValue())
                 .faultTolerant()
                 .skipPolicy(bankSkipPolicy)
                 .retry(org.springframework.dao.DataAccessException.class)
@@ -85,29 +105,13 @@ public class MonthlyInterestJobConfig {
 
     @Bean
     public Job monthlyInterestJob(JobRepository jobRepository,
-                                Step monthlyInterestStep,
-                                JobCompletionListener jobCompletionListener) {
+                                  Step monthlyInterestLimpiezaStep,
+                                  Step monthlyInterestStep,
+                                  JobCompletionListener jobCompletionListener) {
         return new JobBuilder("monthlyInterestJob", jobRepository)
                 .listener(jobCompletionListener)
-                .start(monthlyInterestStep)
-                .build();
-    }
-
-    @Bean
-    public TaskExecutor monthlyInterestTaskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(threadPoolSize);
-        executor.setMaxPoolSize(threadPoolSize);
-        executor.setQueueCapacity(10);
-        executor.setThreadNamePrefix("monthly-batch-");
-        executor.initialize();
-        return executor;
-    }
-
-    @Bean
-    public SynchronizedItemStreamReader<Interes> synchronizedInteresReader() {
-        return new SynchronizedItemStreamReaderBuilder<Interes>()
-                .delegate(interesReader())
+                .start(monthlyInterestLimpiezaStep)
+                .next(monthlyInterestStep)
                 .build();
     }
 }

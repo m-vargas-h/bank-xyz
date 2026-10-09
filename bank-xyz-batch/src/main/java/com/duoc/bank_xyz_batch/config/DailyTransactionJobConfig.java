@@ -5,11 +5,13 @@ import com.duoc.bank_xyz_batch.listener.JobCompletionListener;
 import com.duoc.bank_xyz_batch.model.Transaccion;
 import com.duoc.bank_xyz_batch.policy.BankSkipPolicy;
 import com.duoc.bank_xyz_batch.processor.TransaccionProcessor;
-import com.duoc.bank_xyz_batch.writer.TransaccionResumenWriter;
+import com.duoc.bank_xyz_batch.tasklet.LimpiezaTasklet;
+import com.duoc.bank_xyz_batch.tasklet.TransaccionResumenTasklet;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.SkipListener;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.JobScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
@@ -23,21 +25,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.task.TaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.retry.backoff.ExponentialBackOffPolicy;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
 
 @Configuration
 public class DailyTransactionJobConfig {
-
-    @Value("${batch.thread-pool-size}")
-    private int threadPoolSize;
-
-    @Value("${batch.chunk-size}")
-    private int chunkSize;
 
     @Bean
     public FlatFileItemReader<Transaccion> transaccionReader() {
@@ -48,6 +44,14 @@ public class DailyTransactionJobConfig {
                 .names("id", "fecha", "monto", "tipo")
                 .linesToSkip(1)
                 .targetType(Transaccion.class)
+                .saveState(false)
+                .build();
+    }
+
+    @Bean
+    public SynchronizedItemStreamReader<Transaccion> synchronizedTransaccionReader() {
+        return new SynchronizedItemStreamReaderBuilder<Transaccion>()
+                .delegate(transaccionReader())
                 .build();
     }
 
@@ -56,26 +60,42 @@ public class DailyTransactionJobConfig {
         return new JdbcBatchItemWriterBuilder<Transaccion>()
                 .dataSource(dataSource)
                 .sql("INSERT INTO transaccion_reporte (transaccion_id, fecha, monto, tipo, estado) " +
-                    "VALUES (:id, :fecha, :monto, :tipo, 'PROCESADO')")
+                     "VALUES (:id, :fecha, :monto, :tipo, 'PROCESADO')")
                 .beanMapped()
                 .build();
     }
 
     @Bean
+    public Step dailyTransactionLimpiezaStep(JobRepository jobRepository,
+                                             PlatformTransactionManager transactionManager,
+                                             JdbcTemplate jdbcTemplate) {
+        return new StepBuilder("dailyTransactionLimpiezaStep", jobRepository)
+                .tasklet(new LimpiezaTasklet(jdbcTemplate, "transaccion_reporte", "transaccion_resumen"),
+                        transactionManager)
+                .build();
+    }
+
+    @Bean
+    @JobScope
     public Step dailyTransactionStep(JobRepository jobRepository,
-                                    PlatformTransactionManager transactionManager,
-                                    SynchronizedItemStreamReader<Transaccion> synchronizedTransaccionReader,
-                                    TransaccionProcessor transaccionProcessor,
-                                    JdbcBatchItemWriter<Transaccion> transaccionWriter,
-                                    TaskExecutor dailyTransactionTaskExecutor,
-                                    BankSkipPolicy bankSkipPolicy,
-                                    BankSkipListener<Transaccion, Transaccion> bankSkipListener) {
+                                     PlatformTransactionManager transactionManager,
+                                     SynchronizedItemStreamReader<Transaccion> synchronizedTransaccionReader,
+                                     TransaccionProcessor transaccionProcessor,
+                                     JdbcBatchItemWriter<Transaccion> transaccionWriter,
+                                     BankSkipPolicy bankSkipPolicy,
+                                     BankSkipListener<Transaccion, Transaccion> bankSkipListener,
+                                     @Value("#{jobParameters['threads']}") Long threads,
+                                     @Value("#{jobParameters['chunkSize']}") Long chunkSize) {
+        SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor("daily-batch-");
+        executor.setConcurrencyLimit(threads.intValue());
+
         return new StepBuilder("dailyTransactionStep", jobRepository)
-                .<Transaccion, Transaccion>chunk(chunkSize, transactionManager)
+                .<Transaccion, Transaccion>chunk(chunkSize.intValue(), transactionManager)
                 .reader(synchronizedTransaccionReader)
                 .processor(transaccionProcessor)
                 .writer(transaccionWriter)
-                .taskExecutor(dailyTransactionTaskExecutor)
+                .taskExecutor(executor)
+                .throttleLimit(threads.intValue())
                 .faultTolerant()
                 .skipPolicy(bankSkipPolicy)
                 .retry(org.springframework.dao.DataAccessException.class)
@@ -88,44 +108,23 @@ public class DailyTransactionJobConfig {
     @Bean
     public Step dailyTransactionResumenStep(JobRepository jobRepository,
                                             PlatformTransactionManager transactionManager,
-                                            TransaccionResumenWriter transaccionResumenWriter,
-                                            BankSkipPolicy bankSkipPolicy) {
+                                            TransaccionResumenTasklet transaccionResumenTasklet) {
         return new StepBuilder("dailyTransactionResumenStep", jobRepository)
-                .<Transaccion, Transaccion>chunk(100, transactionManager)
-                .reader(transaccionReader())
-                .writer(transaccionResumenWriter)
-                .faultTolerant()
-                .skipPolicy(bankSkipPolicy)
+                .tasklet(transaccionResumenTasklet, transactionManager)
                 .build();
     }
 
     @Bean
     public Job dailyTransactionReportJob(JobRepository jobRepository,
-                                        Step dailyTransactionStep,
-                                        Step dailyTransactionResumenStep,
-                                        JobCompletionListener jobCompletionListener) {
+                                         Step dailyTransactionLimpiezaStep,
+                                         Step dailyTransactionStep,
+                                         Step dailyTransactionResumenStep,
+                                         JobCompletionListener jobCompletionListener) {
         return new JobBuilder("dailyTransactionReportJob", jobRepository)
                 .listener(jobCompletionListener)
-                .start(dailyTransactionStep)
+                .start(dailyTransactionLimpiezaStep)
+                .next(dailyTransactionStep)
                 .next(dailyTransactionResumenStep)
-                .build();
-    }
-
-    @Bean
-    public TaskExecutor dailyTransactionTaskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(threadPoolSize);
-        executor.setMaxPoolSize(threadPoolSize);
-        executor.setQueueCapacity(10);
-        executor.setThreadNamePrefix("daily-batch-");
-        executor.initialize();
-        return executor;
-    }
-
-    @Bean
-    public SynchronizedItemStreamReader<Transaccion> synchronizedTransaccionReader() {
-        return new SynchronizedItemStreamReaderBuilder<Transaccion>()
-                .delegate(transaccionReader())
                 .build();
     }
 }
