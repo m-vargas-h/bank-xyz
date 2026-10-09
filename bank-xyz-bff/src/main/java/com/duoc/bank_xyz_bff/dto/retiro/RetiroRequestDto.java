@@ -4,5 +4,6 @@ import lombok.Data;
 
 @Data
 public class RetiroRequestDto {
+    private Integer cuentaId;
     private Integer monto;
 }

@@ -1,0 +1,11 @@
+INSERT IGNORE INTO cuenta (cuenta_id, titular, saldo) VALUES
+(101, 'Cliente 101', 1000000), (102, 'Cliente 102', 1000000),
+(103, 'Cliente 103', 1000000), (104, 'Cliente 104', 1000000),
+(105, 'Cliente 105', 1000000), (106, 'Cliente 106', 1000000),
+(107, 'Cliente 107', 1000000), (108, 'Cliente 108', 1000000),
+(109, 'Cliente 109', 1000000), (110, 'Cliente 110', 1000000),
+(111, 'Cliente 111', 500000),  (112, 'Cliente 112', 500000),
+(113, 'Cliente 113', 500000),  (114, 'Cliente 114', 500000),
+(115, 'Cliente 115', 500000),  (116, 'Cliente 116', 500000),
+(117, 'Cliente 117', 500000),  (118, 'Cliente 118', 500000),
+(119, 'Cliente 119', 500000),  (120, 'Cliente 120', 500000);

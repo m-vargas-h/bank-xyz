@@ -1,17 +1,19 @@
 package com.duoc.bank_xyz_bff.controller;
 
-import com.duoc.bank_xyz_bff.dto.vista.VistaCuentaAtmDto;
-import com.duoc.bank_xyz_bff.dto.retiro.*;
 import com.duoc.bank_xyz_bff.dto.ApiResponse;
 import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualMobileDto;
 import com.duoc.bank_xyz_bff.dto.interes.InteresMobileDto;
 import com.duoc.bank_xyz_bff.dto.resumen.ResumenAtmDto;
+import com.duoc.bank_xyz_bff.dto.retiro.RetiroEstadoDto;
+import com.duoc.bank_xyz_bff.dto.retiro.RetiroRequestDto;
+import com.duoc.bank_xyz_bff.dto.retiro.RetiroResponseDto;
+import com.duoc.bank_xyz_bff.dto.vista.VistaCuentaAtmDto;
 import com.duoc.bank_xyz_bff.exception.ResourceNotFoundException;
 import com.duoc.bank_xyz_bff.service.BffDataService;
-
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.http.HttpStatus;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -64,13 +66,28 @@ public class AtmBffController {
 
     @PostMapping("/retiro")
     public ResponseEntity<ApiResponse<RetiroResponseDto>> retirar(@RequestBody RetiroRequestDto req) {
+        if (req.getCuentaId() == null || req.getCuentaId() <= 0)
+            throw new IllegalArgumentException("cuentaId es obligatorio");
         if (req.getMonto() == null || req.getMonto() <= 0)
             throw new IllegalArgumentException("El monto debe ser mayor a 0");
-        var r = dataService.registrarRetiro(req.getMonto());
+
+        var r = dataService.registrarRetiro(req.getCuentaId(), req.getMonto());
         var dto = new RetiroResponseDto(
                 ((Number) r.get("id")).intValue(),
                 ((Number) r.get("monto")).intValue(),
                 (String) r.get("estado"));
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(new ApiResponse<>("atm", dto));
+    }
+
+    @GetMapping("/retiro/{id}")
+    public ResponseEntity<ApiResponse<RetiroEstadoDto>> getEstadoRetiro(@PathVariable int id) {
+        var r = dataService.getEstadoRetiro(id);
+        var dto = new RetiroEstadoDto(
+                ((Number) r.get("id")).intValue(),
+                ((Number) r.get("cuenta_id")).intValue(),
+                ((Number) r.get("monto")).intValue(),
+                (String) r.get("estado"),
+                (String) r.get("motivo"));
+        return ResponseEntity.ok(new ApiResponse<>("atm", dto));
     }
 }

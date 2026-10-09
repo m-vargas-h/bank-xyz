@@ -2,26 +2,26 @@ package com.duoc.bank_xyz_bff.controller;
 
 import com.duoc.bank_xyz_bff.config.SecurityConfig;
 import com.duoc.bank_xyz_bff.dto.interes.InteresDto;
+import com.duoc.bank_xyz_bff.exception.ResourceNotFoundException;
 import com.duoc.bank_xyz_bff.service.BffDataService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
-import org.springframework.http.MediaType;
-import java.util.Map;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AtmBffController.class)
 @Import(SecurityConfig.class)
@@ -80,12 +80,12 @@ class AtmBffControllerTest {
     @Test
     @WithMockUser(roles = "ATM")
     void retiro_valido_retorna202() throws Exception {
-        when(dataService.registrarRetiro(5000))
+        when(dataService.registrarRetiro(101, 5000))
                 .thenReturn(Map.of("id", 42, "monto", 5000, "estado", "PENDIENTE"));
 
         mockMvc.perform(post("/atm/retiro")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"monto\":5000}"))
+                        .content("{\"cuentaId\":101,\"monto\":5000}"))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.canal").value("atm"))
                 .andExpect(jsonPath("$.datos.id").value(42))
@@ -97,7 +97,17 @@ class AtmBffControllerTest {
     void retiro_montoInvalido_retorna400() throws Exception {
         mockMvc.perform(post("/atm/retiro")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"monto\":-10}"))
+                        .content("{\"cuentaId\":101,\"monto\":-10}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.codigo").value(400));
+    }
+
+    @Test
+    @WithMockUser(roles = "ATM")
+    void retiro_sinCuenta_retorna400() throws Exception {
+        mockMvc.perform(post("/atm/retiro")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"monto\":5000}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.codigo").value(400));
     }
@@ -107,7 +117,31 @@ class AtmBffControllerTest {
     void retiro_conRolIncorrecto_retorna403() throws Exception {
         mockMvc.perform(post("/atm/retiro")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"monto\":5000}"))
+                        .content("{\"cuentaId\":101,\"monto\":5000}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ATM")
+    void estadoRetiro_existente_retornaOk() throws Exception {
+        when(dataService.getEstadoRetiro(42)).thenReturn(Map.of(
+                "id", 42, "cuenta_id", 101, "monto", 5000,
+                "estado", "FALLIDA", "motivo", "Saldo insuficiente"));
+
+        mockMvc.perform(get("/atm/retiro/42"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.datos.estado").value("FALLIDA"))
+                .andExpect(jsonPath("$.datos.motivo").value("Saldo insuficiente"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ATM")
+    void estadoRetiro_noExiste_retorna404() throws Exception {
+        when(dataService.getEstadoRetiro(999))
+                .thenThrow(new ResourceNotFoundException("Transacción no encontrada: 999"));
+
+        mockMvc.perform(get("/atm/retiro/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value(404));
     }
 }

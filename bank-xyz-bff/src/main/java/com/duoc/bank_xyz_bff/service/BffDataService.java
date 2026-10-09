@@ -5,11 +5,13 @@ import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualResumenDto;
 import com.duoc.bank_xyz_bff.dto.interes.InteresDto;
 import com.duoc.bank_xyz_bff.dto.transaccion.TransaccionDto;
 import com.duoc.bank_xyz_bff.dto.transaccion.TransaccionResumenDto;
+import com.duoc.bank_xyz_bff.exception.ResourceNotFoundException;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
-import java.util.Map;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class BffDataService {
@@ -21,9 +23,7 @@ public class BffDataService {
     private static final ParameterizedTypeReference<List<CuentaAnualDto>> CUENTAS_T = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<CuentaAnualResumenDto>> CUENTAS_RESUMEN_T = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<InteresDto>> INTERESES_T = new ParameterizedTypeReference<>() {};
-
     private static final ParameterizedTypeReference<Map<String, Object>> MAP_T = new ParameterizedTypeReference<>() {};
-
 
     private final MsClient ms;
 
@@ -76,8 +76,17 @@ public class BffDataService {
         return getCuentaAnualById(cuentaId);
     }
 
-    // --- Retiro ATM ---
-    public Map<String, Object> registrarRetiro(int monto) {
-        return ms.post(TRANSACCIONES, Map.of("monto", monto, "tipo", "retiro"), MAP_T);
+    // --- Retiro ATM (inicia la Saga en ms-transacciones) ---
+    public Map<String, Object> registrarRetiro(int cuentaId, int monto) {
+        return ms.post(TRANSACCIONES,
+                Map.of("cuentaId", cuentaId, "monto", monto, "tipo", "retiro"), MAP_T);
+    }
+
+    public Map<String, Object> getEstadoRetiro(int id) {
+        try {
+            return ms.get(TRANSACCIONES + "/estado/" + id, MAP_T);
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new ResourceNotFoundException("Transacción no encontrada: " + id);
+        }
     }
 }

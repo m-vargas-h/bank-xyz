@@ -2,17 +2,20 @@ package com.duoc.ms_transacciones.controllers;
 
 import com.duoc.ms_transacciones.services.TransaccionesService;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.beans.factory.annotation.Autowired;
-import java.util.concurrent.CompletableFuture;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/transacciones")
@@ -34,6 +37,11 @@ public class TransaccionesController {
         return transaccionesService.getResumen();
     }
 
+    @GetMapping("/estado/{id}")
+    public Map<String, Object> getEstado(@PathVariable int id) {
+        return transaccionesService.obtenerEstado(id);
+    }
+
     @GetMapping("/info")
     public Map<String, String> info() {
         return Map.of("servicio", descripcion, "status", "UP");
@@ -51,9 +59,14 @@ public class TransaccionesController {
 
     @PostMapping
     public Map<String, Object> crearTransaccion(@RequestBody Map<String, Object> body) {
-        int monto = (int) body.get("monto");
-        String tipo = (String) body.get("tipo");
-        return transaccionesService.registrarTransaccion(monto, tipo);
+        Object cuentaId = body.get("cuentaId");
+        Object monto = body.get("monto");
+        Object tipo = body.get("tipo");
+        if (!(cuentaId instanceof Number) || !(monto instanceof Number) || !(tipo instanceof String)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "cuentaId, monto y tipo son obligatorios");
+        }
+        return transaccionesService.registrarTransaccion(
+            ((Number) cuentaId).intValue(), ((Number) monto).intValue(), (String) tipo);
     }
-
 }
