@@ -10,6 +10,7 @@ import com.duoc.bank_xyz_bff.dto.retiro.RetiroResponseDto;
 import com.duoc.bank_xyz_bff.dto.vista.VistaCuentaAtmDto;
 import com.duoc.bank_xyz_bff.exception.ResourceNotFoundException;
 import com.duoc.bank_xyz_bff.service.BffDataService;
+import com.duoc.bank_xyz_bff.dto.cuenta.SaldoAtmDto;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,13 +29,14 @@ public class AtmBffController {
     }
 
     @GetMapping("/saldo/{cuentaId}")
-    public ResponseEntity<ApiResponse<List<InteresMobileDto>>> getSaldo(@PathVariable int cuentaId) {
-        var data = dataService.getInteresByCuenta(cuentaId);
-        if (data.isEmpty()) throw new ResourceNotFoundException("Cuenta no encontrada: " + cuentaId);
-        List<InteresMobileDto> reducida = data.stream()
-                .map(i -> new InteresMobileDto(i.getCuentaId(), i.getSaldo(), i.getTipo()))
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(new ApiResponse<>("atm", reducida));
+    public ResponseEntity<ApiResponse<SaldoAtmDto>> getSaldo(@PathVariable int cuentaId) {
+        var r = dataService.getSaldoCuenta(cuentaId);
+        var dto = new SaldoAtmDto(
+                ((Number) r.get("cuenta_id")).intValue(),
+                (String) r.get("titular"),
+                ((Number) r.get("saldo")).longValue(),
+                (String) r.get("estado"));
+        return ResponseEntity.ok(new ApiResponse<>("atm", dto));
     }
 
     @GetMapping("/transacciones/{cuentaId}")

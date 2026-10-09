@@ -30,6 +30,11 @@ public class CuentasController {
         return cuentasService.getResumenCuentas();
     }
 
+    @GetMapping("/{cuentaId}/saldo")
+    public Map<String, Object> getSaldo(@PathVariable int cuentaId) {
+        return cuentasService.obtenerSaldo(cuentaId);
+    }
+
     @GetMapping("/resilience")
     public CompletableFuture<List<Map<String, Object>>> getCuentasResiliencia() {
         return cuentasService.getCuentasConResiliencia();

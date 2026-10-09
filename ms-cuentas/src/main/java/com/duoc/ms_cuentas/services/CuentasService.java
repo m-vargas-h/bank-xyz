@@ -12,6 +12,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,15 @@ public class CuentasService {
 
     public List<Map<String, Object>> getResumenCuentas() {
         return jdbc.queryForList("SELECT * FROM cuenta_anual_resumen");
+    }
+
+    public Map<String, Object> obtenerSaldo(int cuentaId) {
+        List<Map<String, Object>> filas = jdbc.queryForList(
+            "SELECT cuenta_id, titular, saldo, estado FROM cuenta WHERE cuenta_id = ?", cuentaId);
+        if (filas.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Cuenta no encontrada: " + cuentaId);
+        }
+        return filas.get(0);
     }
 
     @CircuitBreaker(name = "cuentasService")

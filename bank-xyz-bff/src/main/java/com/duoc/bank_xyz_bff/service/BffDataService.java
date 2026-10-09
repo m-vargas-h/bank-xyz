@@ -89,4 +89,12 @@ public class BffDataService {
             throw new ResourceNotFoundException("Transacción no encontrada: " + id);
         }
     }
+
+    public Map<String, Object> getSaldoCuenta(int cuentaId) {
+        try {
+            return ms.get(CUENTAS + "/" + cuentaId + "/saldo", MAP_T);
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new ResourceNotFoundException("Cuenta no encontrada: " + cuentaId);
+        }
+    }
 }

@@ -45,24 +45,21 @@ class AtmBffControllerTest {
     @Test
     @WithMockUser(roles = "ATM")
     void getSaldo_conRolAtm_retornaOk() throws Exception {
-        InteresDto i = new InteresDto();
-        i.setCuentaId(1L);
-        i.setSaldo(new BigDecimal("8000"));
-        i.setTipo("corriente");
+        when(dataService.getSaldoCuenta(101)).thenReturn(Map.of(
+                "cuenta_id", 101, "titular", "Cliente 101", "saldo", 995000, "estado", "ACTIVA"));
 
-        when(dataService.getInteresByCuenta(1)).thenReturn(List.of(i));
-
-        mockMvc.perform(get("/atm/saldo/1"))
+        mockMvc.perform(get("/atm/saldo/101"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.canal").value("atm"))
                 .andExpect(jsonPath("$.estado").value("ok"))
-                .andExpect(jsonPath("$.datos[0].saldo").value(8000));
+                .andExpect(jsonPath("$.datos.saldo").value(995000));
     }
 
     @Test
     @WithMockUser(roles = "ATM")
     void getSaldo_cuentaNoExiste_retorna404() throws Exception {
-        when(dataService.getInteresByCuenta(9999)).thenReturn(List.of());
+        when(dataService.getSaldoCuenta(9999))
+                .thenThrow(new ResourceNotFoundException("Cuenta no encontrada: 9999"));
 
         mockMvc.perform(get("/atm/saldo/9999"))
                 .andExpect(status().isNotFound())
