@@ -45,8 +45,10 @@ public class RestClientConfig {
                     c.add(0, new MappingJackson2HttpMessageConverter(snake));
                 })
                 .requestInterceptor((request, body, execution) -> {
+                    String registro = request.getMethod() == org.springframework.http.HttpMethod.GET
+                            ? "bff-read" : "bff-write";
                     var client = manager.authorize(OAuth2AuthorizeRequest
-                            .withClientRegistrationId("bff-read").principal("bank-xyz-bff").build());
+                            .withClientRegistrationId(registro).principal("bank-xyz-bff").build());
                     request.getHeaders().setBearerAuth(client.getAccessToken().getTokenValue());
                     return execution.execute(request, body);
                 })

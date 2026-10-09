@@ -1,16 +1,17 @@
 package com.duoc.bank_xyz_bff.controller;
 
 import com.duoc.bank_xyz_bff.dto.vista.VistaCuentaAtmDto;
-
+import com.duoc.bank_xyz_bff.dto.retiro.*;
 import com.duoc.bank_xyz_bff.dto.ApiResponse;
 import com.duoc.bank_xyz_bff.dto.cuenta.CuentaAnualMobileDto;
 import com.duoc.bank_xyz_bff.dto.interes.InteresMobileDto;
 import com.duoc.bank_xyz_bff.dto.resumen.ResumenAtmDto;
 import com.duoc.bank_xyz_bff.exception.ResourceNotFoundException;
 import com.duoc.bank_xyz_bff.service.BffDataService;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.http.HttpStatus;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -59,5 +60,17 @@ public class AtmBffController {
         if (intereses.isEmpty())
             throw new ResourceNotFoundException("Sin datos para cuenta: " + cuentaId);
         return ResponseEntity.ok(new ApiResponse<>("atm", new VistaCuentaAtmDto(intereses)));
+    }
+
+    @PostMapping("/retiro")
+    public ResponseEntity<ApiResponse<RetiroResponseDto>> retirar(@RequestBody RetiroRequestDto req) {
+        if (req.getMonto() == null || req.getMonto() <= 0)
+            throw new IllegalArgumentException("El monto debe ser mayor a 0");
+        var r = dataService.registrarRetiro(req.getMonto());
+        var dto = new RetiroResponseDto(
+                ((Number) r.get("id")).intValue(),
+                ((Number) r.get("monto")).intValue(),
+                (String) r.get("estado"));
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(new ApiResponse<>("atm", dto));
     }
 }

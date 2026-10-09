@@ -19,6 +19,10 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import org.springframework.http.MediaType;
+import java.util.Map;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+
 @WebMvcTest(AtmBffController.class)
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = {
@@ -70,6 +74,40 @@ class AtmBffControllerTest {
     @WithMockUser(roles = "WEB")
     void getSaldo_conRolIncorrecto_retorna403() throws Exception {
         mockMvc.perform(get("/atm/saldo/1"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ATM")
+    void retiro_valido_retorna202() throws Exception {
+        when(dataService.registrarRetiro(5000))
+                .thenReturn(Map.of("id", 42, "monto", 5000, "estado", "PENDIENTE"));
+
+        mockMvc.perform(post("/atm/retiro")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"monto\":5000}"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.canal").value("atm"))
+                .andExpect(jsonPath("$.datos.id").value(42))
+                .andExpect(jsonPath("$.datos.estado").value("PENDIENTE"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ATM")
+    void retiro_montoInvalido_retorna400() throws Exception {
+        mockMvc.perform(post("/atm/retiro")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"monto\":-10}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.codigo").value(400));
+    }
+
+    @Test
+    @WithMockUser(roles = "WEB")
+    void retiro_conRolIncorrecto_retorna403() throws Exception {
+        mockMvc.perform(post("/atm/retiro")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"monto\":5000}"))
                 .andExpect(status().isForbidden());
     }
 }

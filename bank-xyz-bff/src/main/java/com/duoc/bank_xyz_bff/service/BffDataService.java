@@ -7,6 +7,7 @@ import com.duoc.bank_xyz_bff.dto.transaccion.TransaccionDto;
 import com.duoc.bank_xyz_bff.dto.transaccion.TransaccionResumenDto;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
+import java.util.Map;
 
 import java.util.List;
 
@@ -20,6 +21,9 @@ public class BffDataService {
     private static final ParameterizedTypeReference<List<CuentaAnualDto>> CUENTAS_T = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<CuentaAnualResumenDto>> CUENTAS_RESUMEN_T = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<InteresDto>> INTERESES_T = new ParameterizedTypeReference<>() {};
+
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP_T = new ParameterizedTypeReference<>() {};
+
 
     private final MsClient ms;
 
@@ -70,5 +74,10 @@ public class BffDataService {
 
     public List<CuentaAnualDto> getMovimientosByCuenta(int cuentaId) {
         return getCuentaAnualById(cuentaId);
+    }
+
+    // --- Retiro ATM ---
+    public Map<String, Object> registrarRetiro(int monto) {
+        return ms.post(TRANSACCIONES, Map.of("monto", monto, "tipo", "retiro"), MAP_T);
     }
 }

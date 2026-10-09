@@ -15,6 +15,13 @@ spring:
             authorization-grant-type: client_credentials
             client-authentication-method: client_secret_basic
             scope: cuentas.read,transacciones.read,clientes.read
+          bff-write:
+            provider: bank-auth
+            client-id: bank-xyz-client
+            client-secret: ${BANK_CLIENT_SECRET:secret123}
+            authorization-grant-type: client_credentials
+            client-authentication-method: client_secret_basic
+            scope: transacciones.write
 
 server:
   port: 8443
