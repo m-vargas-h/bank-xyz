@@ -1,0 +1,1575 @@
+{
+  "info": {
+    "_postman_id": "c24dbda0-03c8-4907-9547-3468482865e2",
+    "name": "Banco XYZ - Batería de pruebas",
+    "description": "Pruebas de todos los componentes. Usar el environment 'Banco XYZ - Local'. Desactivar 'SSL certificate verification' (certificado autofirmado del BFF). Orden: 0, 1, 2, 3, 4, 5, 6, 7. La carpeta 8 es manual.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Autenticación OAuth2",
+      "item": [
+        {
+          "name": "Obtener token (client_credentials)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{authUrl}}/oauth2/token",
+              "host": [
+                "{{authUrl}}"
+              ],
+              "path": [
+                "oauth2",
+                "token"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "scope",
+                  "value": "cuentas.read transacciones.read clientes.read transacciones.write"
+                }
+              ]
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{clientId}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{clientSecret}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve access_token Bearer\", () => { pm.expect(j.access_token).to.be.a(\"string\"); pm.expect(j.token_type).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"token\", j.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Microservicio sin token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msCuentasUrl}}/api/cuentas/101/saldo",
+              "host": [
+                "{{msCuentasUrl}}"
+              ],
+              "path": [
+                "api",
+                "cuentas",
+                "101",
+                "saldo"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. BFF Web",
+      "item": [
+        {
+          "name": "Resumen de transacciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/web/transacciones/resumen",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "web",
+                "transacciones",
+                "resumen"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Canal web con resumen completo\", () => { pm.expect(j.canal).to.eql(\"web\"); pm.expect(j.datos).to.have.property(\"totalProcesadas\"); pm.expect(j.datos).to.have.property(\"montoTotal\"); pm.expect(j.datos).to.have.property(\"totalAnomalias\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cuentas anuales",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/web/cuentas",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "web",
+                "cuentas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Intereses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/web/intereses",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "web",
+                "intereses"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Canal incorrecto: ATM en /web (403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/web/cuentas",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "web",
+                "cuentas"
+              ]
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{atmUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{atmPass}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin credenciales (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/web/cuentas",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "web",
+                "cuentas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "auth": {
+        "type": "basic",
+        "basic": [
+          {
+            "key": "username",
+            "value": "{{webUser}}",
+            "type": "string"
+          },
+          {
+            "key": "password",
+            "value": "{{webPass}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "2. BFF Móvil",
+      "item": [
+        {
+          "name": "Resumen de transacciones (reducido)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/mobile/transacciones/resumen",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "mobile",
+                "transacciones",
+                "resumen"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Canal mobile con campos esenciales\", () => { pm.expect(j.canal).to.eql(\"mobile\"); pm.expect(j.datos).to.not.have.property(\"totalProcesadas\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cuentas (reducido)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/mobile/cuentas",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "mobile",
+                "cuentas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Intereses (reducido)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/mobile/intereses",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "mobile",
+                "intereses"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "auth": {
+        "type": "basic",
+        "basic": [
+          {
+            "key": "username",
+            "value": "{{mobileUser}}",
+            "type": "string"
+          },
+          {
+            "key": "password",
+            "value": "{{mobilePass}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "3. BFF ATM",
+      "item": [
+        {
+          "name": "Saldo cuenta existente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/atm/saldo/{{cuentaOk}}",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "saldo",
+                "{{cuentaOk}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Saldo real de la cuenta\", () => { pm.expect(j.canal).to.eql(\"atm\"); pm.expect(j.datos.cuentaId).to.eql(parseInt(pm.variables.get(\"cuentaOk\"))); pm.expect(j.datos.saldo).to.be.a(\"number\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Saldo cuenta inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/atm/saldo/{{cuentaInexistente}}",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "saldo",
+                "{{cuentaInexistente}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Error uniforme\", () => { const j = pm.response.json(); pm.expect(j.estado).to.eql(\"error\"); pm.expect(j.codigo).to.eql(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resumen ATM (mínimo)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/atm/resumen",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "resumen"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Canal incorrecto: Web en /atm (403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/atm/saldo/{{cuentaOk}}",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "saldo",
+                "{{cuentaOk}}"
+              ]
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{webUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{webPass}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "auth": {
+        "type": "basic",
+        "basic": [
+          {
+            "key": "username",
+            "value": "{{atmUser}}",
+            "type": "string"
+          },
+          {
+            "key": "password",
+            "value": "{{atmPass}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "4. Saga: retiro ATM",
+      "item": [
+        {
+          "name": "4.1 Saldo antes del retiro",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/atm/saldo/{{cuentaOk}}",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "saldo",
+                "{{cuentaOk}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"saldoAntes\", pm.response.json().datos.saldo);",
+                  "console.log(\"Saldo antes:\", pm.collectionVariables.get(\"saldoAntes\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.2 Retiro válido (202)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bffUrl}}/atm/retiro",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "retiro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cuentaId\": {{cuentaOk}}, \"monto\": {{montoOk}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 202\", () => pm.response.to.have.status(202));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Queda PENDIENTE y devuelve id\", () => { pm.expect(j.datos.estado).to.eql(\"PENDIENTE\"); pm.expect(j.datos.id).to.be.a(\"number\"); });",
+                  "pm.collectionVariables.set(\"idOk\", j.datos.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.3 Estado: COMPLETADA",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/atm/retiro/{{idOk}}",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "retiro",
+                "{{idOk}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// la Saga es asíncrona: espera 2 s antes de consultar",
+                  "setTimeout(() => {}, 2000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Saga completada\", () => pm.expect(pm.response.json().datos.estado).to.eql(\"COMPLETADA\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.4 Saldo después (descontado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/atm/saldo/{{cuentaOk}}",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "saldo",
+                "{{cuentaOk}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const antes = parseInt(pm.collectionVariables.get(\"saldoAntes\")), monto = parseInt(pm.variables.get(\"montoOk\"));",
+                  "pm.test(\"Saldo = antes - monto\", () => pm.expect(pm.response.json().datos.saldo).to.eql(antes - monto));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.5 Retiro sin saldo suficiente (202)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bffUrl}}/atm/retiro",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "retiro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cuentaId\": {{cuentaOk}}, \"monto\": {{montoExcesivo}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 202\", () => pm.response.to.have.status(202));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Queda PENDIENTE y devuelve id\", () => { pm.expect(j.datos.estado).to.eql(\"PENDIENTE\"); pm.expect(j.datos.id).to.be.a(\"number\"); });",
+                  "pm.collectionVariables.set(\"idRechazado\", j.datos.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.6 Estado: FALLIDA por saldo insuficiente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/atm/retiro/{{idRechazado}}",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "retiro",
+                "{{idRechazado}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// la Saga es asíncrona: espera 2 s antes de consultar",
+                  "setTimeout(() => {}, 2000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test(\"Compensación: FALLIDA con motivo\", () => { pm.expect(d.estado).to.eql(\"FALLIDA\"); pm.expect(d.motivo).to.eql(\"Saldo insuficiente\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.7 Retiro a cuenta inexistente (202)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bffUrl}}/atm/retiro",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "retiro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cuentaId\": {{cuentaInexistente}}, \"monto\": 1000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 202\", () => pm.response.to.have.status(202));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Queda PENDIENTE y devuelve id\", () => { pm.expect(j.datos.estado).to.eql(\"PENDIENTE\"); pm.expect(j.datos.id).to.be.a(\"number\"); });",
+                  "pm.collectionVariables.set(\"idInexistente\", j.datos.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.8 Estado: FALLIDA por cuenta inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/atm/retiro/{{idInexistente}}",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "retiro",
+                "{{idInexistente}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// la Saga es asíncrona: espera 2 s antes de consultar",
+                  "setTimeout(() => {}, 2000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test(\"FALLIDA: cuenta inexistente\", () => { pm.expect(d.estado).to.eql(\"FALLIDA\"); pm.expect(d.motivo).to.eql(\"Cuenta inexistente o inactiva\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.9 Validación: monto negativo (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bffUrl}}/atm/retiro",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "retiro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cuentaId\": {{cuentaOk}}, \"monto\": -10}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.10 Validación: sin cuentaId (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{bffUrl}}/atm/retiro",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "retiro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"monto\": 5000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.11 Estado de transacción inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/atm/retiro/99999999",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "atm",
+                "retiro",
+                "99999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "auth": {
+        "type": "basic",
+        "basic": [
+          {
+            "key": "username",
+            "value": "{{atmUser}}",
+            "type": "string"
+          },
+          {
+            "key": "password",
+            "value": "{{atmPass}}",
+            "type": "string"
+          }
+        ]
+      },
+      "description": "Ejecutar en orden con el Collection Runner. Demuestra la Saga: PENDIENTE → COMPLETADA / FALLIDA y el saldo real."
+    },
+    {
+      "name": "5. Batch",
+      "item": [
+        {
+          "name": "Reporte de transacciones diarias",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{batchUrl}}/jobs/daily-transaction?threads={{threads}}&chunkSize={{chunkSize}}",
+              "host": [
+                "{{batchUrl}}"
+              ],
+              "path": [
+                "jobs",
+                "daily-transaction"
+              ],
+              "query": [
+                {
+                  "key": "threads",
+                  "value": "{{threads}}"
+                },
+                {
+                  "key": "chunkSize",
+                  "value": "{{chunkSize}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Job COMPLETED\", () => pm.expect(pm.response.text()).to.include(\"COMPLETED\"));",
+                  "console.log(pm.response.text());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cálculo de intereses mensuales",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{batchUrl}}/jobs/monthly-interest?threads={{threads}}&chunkSize={{chunkSize}}",
+              "host": [
+                "{{batchUrl}}"
+              ],
+              "path": [
+                "jobs",
+                "monthly-interest"
+              ],
+              "query": [
+                {
+                  "key": "threads",
+                  "value": "{{threads}}"
+                },
+                {
+                  "key": "chunkSize",
+                  "value": "{{chunkSize}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Job COMPLETED\", () => pm.expect(pm.response.text()).to.include(\"COMPLETED\"));",
+                  "console.log(pm.response.text());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estados de cuenta anuales",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{batchUrl}}/jobs/annual-statement?threads={{threads}}&chunkSize={{chunkSize}}",
+              "host": [
+                "{{batchUrl}}"
+              ],
+              "path": [
+                "jobs",
+                "annual-statement"
+              ],
+              "query": [
+                {
+                  "key": "threads",
+                  "value": "{{threads}}"
+                },
+                {
+                  "key": "chunkSize",
+                  "value": "{{chunkSize}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Job COMPLETED\", () => pm.expect(pm.response.text()).to.include(\"COMPLETED\"));",
+                  "console.log(pm.response.text());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resumen tras el batch (vía BFF Web)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/web/transacciones/resumen",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "web",
+                "transacciones",
+                "resumen"
+              ]
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{webUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{webPass}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Ejecutar dos veces la colección y comparar el resumen: debe ser idéntico (idempotencia). threads y chunkSize se cambian en las variables."
+    },
+    {
+      "name": "6. Microservicios (token OAuth2)",
+      "item": [
+        {
+          "name": "ms-cuentas: saldo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msCuentasUrl}}/api/cuentas/{{cuentaOk}}/saldo",
+              "host": [
+                "{{msCuentasUrl}}"
+              ],
+              "path": [
+                "api",
+                "cuentas",
+                "{{cuentaOk}}",
+                "saldo"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ms-cuentas: resiliencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msCuentasUrl}}/api/cuentas/resilience",
+              "host": [
+                "{{msCuentasUrl}}"
+              ],
+              "path": [
+                "api",
+                "cuentas",
+                "resilience"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ms-cuentas: rate limit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msCuentasUrl}}/api/cuentas/ratelimit",
+              "host": [
+                "{{msCuentasUrl}}"
+              ],
+              "path": [
+                "api",
+                "cuentas",
+                "ratelimit"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 o 429 (rate limiter)\", () => pm.expect([200, 429]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ms-transacciones: resumen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msTransaccionesUrl}}/api/transacciones/resumen",
+              "host": [
+                "{{msTransaccionesUrl}}"
+              ],
+              "path": [
+                "api",
+                "transacciones",
+                "resumen"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ms-transacciones: estado de Saga",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msTransaccionesUrl}}/api/transacciones/estado/{{idOk}}",
+              "host": [
+                "{{msTransaccionesUrl}}"
+              ],
+              "path": [
+                "api",
+                "transacciones",
+                "estado",
+                "{{idOk}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ms-transacciones: resiliencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msTransaccionesUrl}}/api/transacciones/resilience",
+              "host": [
+                "{{msTransaccionesUrl}}"
+              ],
+              "path": [
+                "api",
+                "transacciones",
+                "resilience"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ms-transacciones: rate limit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msTransaccionesUrl}}/api/transacciones/ratelimit",
+              "host": [
+                "{{msTransaccionesUrl}}"
+              ],
+              "path": [
+                "api",
+                "transacciones",
+                "ratelimit"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 o 429 (rate limiter)\", () => pm.expect([200, 429]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "description": "Requiere haber ejecutado '0. Autenticación > Obtener token'."
+    },
+    {
+      "name": "7. Monitoreo (Actuator)",
+      "item": [
+        {
+          "name": "ms-cuentas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msCuentasUrl}}/actuator/health",
+              "host": [
+                "{{msCuentasUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ms-transacciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msTransaccionesUrl}}/actuator/health",
+              "host": [
+                "{{msTransaccionesUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ms-clientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{msClientesUrl}}/actuator/health",
+              "host": [
+                "{{msClientesUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Resiliencia del BFF (manual)",
+      "item": [
+        {
+          "name": "Con ms-cuentas detenido: 503 controlado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bffUrl}}/web/cuentas",
+              "host": [
+                "{{bffUrl}}"
+              ],
+              "path": [
+                "web",
+                "cuentas"
+              ]
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{webUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{webPass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Antes: docker compose stop ms-cuentas. Después: docker compose start ms-cuentas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 503\", () => pm.response.to.have.status(503));",
+                  "pm.test(\"Error uniforme\", () => { const j = pm.response.json(); pm.expect(j.estado).to.eql(\"error\"); pm.expect(j.codigo).to.eql(503); });"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Ejecutar a mano (no incluir en el Runner automático)."
+    }
+  ],
+  "variable": [
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "saldoAntes",
+      "value": ""
+    },
+    {
+      "key": "idOk",
+      "value": ""
+    },
+    {
+      "key": "idRechazado",
+      "value": ""
+    },
+    {
+      "key": "idInexistente",
+      "value": ""
+    }
+  ]
+}
