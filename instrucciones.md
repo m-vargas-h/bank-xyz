@@ -1,6 +1,6 @@
 # Instrucciones de ejecución y pruebas
 
-Cómo levantar el sistema y probar cada componente. Contexto general en [`readme.md`](readme.md); despliegue de Kafka en AWS en [`despliegue.md`](despliegue.md).
+Cómo levantar el sistema y probar cada componente. Contexto general en [`readme.md`](README.md); despliegue de Kafka en AWS en [`despliegue.md`](despliegue.md).
 
 ## 1. Requisitos
 
@@ -149,7 +149,7 @@ docker compose logs batch --tail 40
 ```powershell
 docker compose stop ms-cuentas
 curl.exe -k -u web_user:web_pass_2024 https://localhost:8443/web/cuentas     # 503 controlado
-docker compose start ms-cuentas
+docker compose up -d --no-deps ms-cuentas
 ```
 
 Tras unos segundos el servicio vuelve a responder. Endpoints de demostración en los microservicios (con token): `/api/cuentas/resilience`, `/api/cuentas/ratelimit`, `/api/transacciones/resilience`, `/api/transacciones/ratelimit`.
@@ -180,3 +180,18 @@ docker compose down -v       # borra también los datos
 ## 12. Kafka en AWS
 
 Para usar el broker de la EC2 en lugar del Kafka local, sigue [`despliegue.md`](despliegue.md).
+
+## 13. Pruebas con Postman
+
+La batería completa está en `docs/Postman/`:
+
+- `bank-xyz.postman_collection.json`: 40 requests con tests, agrupados por componente (autenticación, BFF web, móvil y ATM, Saga, batch, microservicios, Actuator y resiliencia).
+- `bank-xyz.postman_environment.json`: environment "Banco XYZ - Local".
+
+Pasos:
+
+1. Importa ambos archivos en Postman y selecciona el environment **Banco XYZ - Local**.
+2. Desactiva *SSL certificate verification* (Settings → General), porque el BFF usa un certificado autofirmado.
+3. Ejecuta cada carpeta con *Run folder*, en este orden: autenticación, BFF Web, Móvil, ATM, Saga, Batch, Microservicios y Actuator.
+
+La carpeta de resiliencia es manual: requiere detener `ms-cuentas` (`docker compose stop ms-cuentas`) y volver a levantarlo con `docker compose up -d --no-deps ms-cuentas`.

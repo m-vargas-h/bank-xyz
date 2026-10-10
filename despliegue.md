@@ -28,13 +28,13 @@ Alcance: **solo Kafka** (con Zookeeper) corre en una instancia EC2. El resto del
 | Tipo | Puerto | Origen |
 |---|---|---|
 | SSH | 22 | Mi IP |
-| TCP personalizado | 9092 | Mi IP |
+| TCP personalizado | 9092 | `0.0.0.0/0` (solo para la demostración) |
 
-Kafka queda sin autenticación (PLAINTEXT), por eso el puerto 9092 **no** se abre a `0.0.0.0/0`.
+> **Nota:** Kafka queda sin autenticación (PLAINTEXT). Abrir el 9092 a `0.0.0.0/0` es aceptable únicamente durante la demostración. En un uso real se limita a la IP de quien se conecta, o se agrega TLS y autenticación. Al terminar, se detiene la instancia.
 
 ![Security Group](docs/evidencias/e14-ec2-sg.png)
 
-**Elastic IP:** asocia una Elastic IP a la instancia para que la dirección no cambie al detenerla. Si el entorno no la permite, la IP pública cambia en cada reinicio y hay que repetir el paso 6.
+**Elastic IP:** se asocia una Elastic IP a la instancia para que la dirección no cambie al detenerla. Se libera al terminar, porque una Elastic IP sin instancia asociada genera cobro.
 
 ## 4. Instalar Docker en la EC2
 
@@ -61,10 +61,10 @@ Desde tu equipo, copia el compose del repositorio:
 scp -i mi-llave.pem deploy/kafka-ec2/docker-compose.yml ec2-user@<EC2_IP>:~/docker-compose.yml
 ```
 
-En la EC2:
+En la EC2, define la IP pública en un archivo `.env` junto al compose (Docker Compose lo lee solo):
 
 ```bash
-export EC2_PUBLIC_IP=<EC2_IP>
+echo "EC2_PUBLIC_IP=<EC2_IP>" > .env
 docker compose up -d
 docker compose ps
 ```
@@ -89,8 +89,10 @@ KAFKA_BOOTSTRAP_SERVERS=<EC2_IP>:9092
 Recrea los servicios que usan Kafka:
 
 ```bash
-docker compose up -d --force-recreate ms-cuentas ms-transacciones ms-clientes
+docker compose up -d --no-deps --force-recreate ms-cuentas ms-transacciones ms-clientes
 ```
+
+`--no-deps` evita que Compose levante el Kafka local, ya que los servicios usan el de la EC2.
 
 El `docker-compose.yml` lee la variable en `SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}`. Si no está definida, se usa el Kafka local.
 
@@ -100,8 +102,8 @@ El `docker-compose.yml` lee la variable en `SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KA
 2. En la EC2, comprueba los tópicos y los mensajes:
 
 ```bash
-docker exec kafka kafka-topics --bootstrap-server localhost:9092 --list
-docker exec kafka kafka-console-consumer --bootstrap-server localhost:9092 \
+docker exec kafka kafka-topics --bootstrap-server localhost:29092 --list
+docker exec kafka kafka-console-consumer --bootstrap-server localhost:29092 \
   --topic cuenta-actualizada --from-beginning --max-messages 3
 ```
 
@@ -116,9 +118,9 @@ docker exec kafka kafka-console-consumer --bootstrap-server localhost:9092 \
 | Síntoma | Causa probable | Solución |
 |---|---|---|
 | Timeout al conectar | Tu IP pública cambió | Actualiza la regla del puerto 9092 |
-| Conecta pero no consume | `EC2_PUBLIC_IP` no estaba exportada al levantar Kafka | `docker compose down`, exportar la variable y volver a levantar |
+| Conecta pero no consume | `EC2_PUBLIC_IP` no estaba definida en el `.env` de la EC2 al levantar Kafka | `docker compose down`, corregir el `.env` y volver a levantar |
 | Puerto cerrado | Security Group sin la regla 9092 | `Test-NetConnection <EC2_IP> -Port 9092` y revisar el grupo |
-| Dejó de funcionar tras reiniciar | La IP pública cambió (sin Elastic IP) | Actualizar `.env` y la variable de la EC2 |
+| Dejó de funcionar tras reiniciar | La IP pública cambió (sin Elastic IP) | Actualizar EC2_PUBLIC_IP en el .env de la EC2 y KAFKA_BOOTSTRAP_SERVERS en el .env local |
 
 ## 9. Costos y limpieza
 

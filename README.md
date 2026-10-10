@@ -1,8 +1,5 @@
 # Banco XYZ – Modernización Backend con Spring Cloud y Spring Batch
 
-Evaluación Final Transversal · Desarrollo Backend III (PBY2203) · Duoc UC
-Autor: Miguel [APELLIDO] · Repositorio: [URL_DEL_REPO]
-
 Migración del sistema legacy del Banco XYZ (COBOL + scripts Shell) a una arquitectura de microservicios: procesos batch en Spring Batch, tres BFF por canal (web, móvil y cajero), microservicios resilientes y seguros, mensajería asíncrona con Kafka y orquestación con Docker Compose.
 
 ## Arquitectura
@@ -32,14 +29,26 @@ Java 21 · Spring Boot 3.5 / 3.3 (batch) · Spring Cloud 2025.0 · Spring Batch 
 ## Estructura del repositorio
 
 ```
-bank-xyz/
-├── config-server/        ├── eureka-server/      ├── auth-server/
-├── ms-cuentas/           ├── ms-transacciones/   ├── ms-clientes/
-├── bank-xyz-bff/         ├── bank-xyz-batch/
-├── deploy/kafka-ec2/     # docker-compose de Kafka para la EC2
-├── docs/evidencias/      # imágenes de los documentos
-├── docker-compose.yml    ├── .env.example
-├── readme.md   instrucciones.md   despliegue.md
+├── auth-server
+├── bank-xyz-batch
+├── bank-xyz-bff
+├── config-server
+├── deploy
+│   └── kafka-ec2
+├── docs
+│   ├── Postman
+│   └── evidencias
+├── eureka-server
+├── ms-clientes
+├── ms-cuentas
+├── ms-transacciones
+├── .env.example
+├── .gitattributes
+├── .gitignore
+├── README.md
+├── despliegue.md
+├── docker-compose.yml
+└── instrucciones.md
 ```
 
 ## Qué incluye cada parte
@@ -47,9 +56,9 @@ bank-xyz/
 - **Batch:** tres jobs con procesamiento multi-hilo parametrizable, tolerancia a registros inválidos, resúmenes idempotentes y reintento automático de la ejecución completa.
 - **BFF:** un módulo con tres canales independientes, cada uno con su rol, su autenticación y su formato de respuesta (completo, reducido o mínimo), todo sobre HTTPS.
 - **Microservicios:** seguridad OAuth2 con scopes, resiliencia (circuit breaker, retry, time limiter y rate limiter) y una Saga coreografiada por Kafka con estado persistido y saldo real.
-- **Despliegue:** todo corre en Docker Compose, con servicios escalables (`--scale`). Solo Kafka se aloja en una instancia EC2.
+- **Despliegue:** todo corre en Docker Compose, con una arquitectura preparada para escalar horizontalmente. Solo Kafka se aloja en una instancia EC2.
 
-El detalle técnico y las decisiones de diseño están en el **informe técnico** (`informe.pdf`).
+El detalle técnico y las decisiones de diseño están en el **informe técnico** (`EFT_S9_MiguelVargas.pdf`).
 
 ![Servicios en Docker Compose](docs/evidencias/e02-compose-ps.png)
 
@@ -69,9 +78,10 @@ El despliegue de Kafka en AWS está en **[`despliegue.md`](despliegue.md)**.
 
 | Documento | Contenido |
 |---|---|
-| `informe.pdf` | Procesos clave, arquitectura, requerimientos de negocio, diagramas, implementación, desafío y mejoras |
+| `EFT_S9_MiguelVargas.pdf` | Procesos clave, arquitectura, requerimientos de negocio, diagramas, implementación, desafío y mejoras |
 | [`instrucciones.md`](instrucciones.md) | Cómo ejecutar y probar cada componente |
 | [`despliegue.md`](despliegue.md) | Despliegue de Kafka en EC2 y conexión con los microservicios |
+| [`docs/Postman/`](docs/Postman/) | Colección y environment con la batería de pruebas de todos los componentes |
 
 ## Datos de origen
 
