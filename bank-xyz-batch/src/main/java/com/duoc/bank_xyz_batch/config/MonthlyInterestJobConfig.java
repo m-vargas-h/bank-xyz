@@ -38,7 +38,7 @@ public class MonthlyInterestJobConfig {
     public FlatFileItemReader<Interes> interesReader() {
         return new FlatFileItemReaderBuilder<Interes>()
                 .name("interesReader")
-                .resource(new ClassPathResource("intereses.csv"))
+                .resource(new ClassPathResource("intereses_trimestrales.csv"))
                 .delimited()
                 .names("cuentaId", "nombre", "saldo", "edad", "tipo")
                 .linesToSkip(1)

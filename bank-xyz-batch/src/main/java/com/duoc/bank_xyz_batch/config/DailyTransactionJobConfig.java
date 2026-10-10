@@ -39,7 +39,7 @@ public class DailyTransactionJobConfig {
     public FlatFileItemReader<Transaccion> transaccionReader() {
         return new FlatFileItemReaderBuilder<Transaccion>()
                 .name("transaccionReader")
-                .resource(new ClassPathResource("transacciones.csv"))
+                .resource(new ClassPathResource("movimientos_financieros_diarios.csv"))
                 .delimited()
                 .names("id", "fecha", "monto", "tipo")
                 .linesToSkip(1)

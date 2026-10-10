@@ -39,7 +39,7 @@ public class AnnualStatementJobConfig {
     public FlatFileItemReader<CuentaAnual> cuentaAnualReader() {
         return new FlatFileItemReaderBuilder<CuentaAnual>()
                 .name("cuentaAnualReader")
-                .resource(new ClassPathResource("cuentas_anuales.csv"))
+                .resource(new ClassPathResource("estados_financieros_anuales.csv"))
                 .delimited()
                 .names("cuentaId", "fecha", "transaccion", "monto", "descripcion")
                 .linesToSkip(1)
