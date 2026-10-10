@@ -19,6 +19,7 @@ Alcance: **solo Kafka** (con Zookeeper) corre en una instancia EC2. El resto del
 | Almacenamiento | 20 GB gp3 |
 | Key pair | El `.pem` creado para este proyecto |
 
+![Tipo de instancia y par de claves](docs/evidencias/despliegue-01-tipo-llave.png)
 ![Instancia EC2 creada](docs/evidencias/e13-ec2-instancia.png)
 
 ## 3. Red y seguridad
@@ -27,14 +28,16 @@ Alcance: **solo Kafka** (con Zookeeper) corre en una instancia EC2. El resto del
 
 | Tipo | Puerto | Origen |
 |---|---|---|
-| SSH | 22 | Mi IP |
+| SSH | 22 | `0.0.0.0/0` (solo para la demostración) |
 | TCP personalizado | 9092 | `0.0.0.0/0` (solo para la demostración) |
 
 > **Nota:** Kafka queda sin autenticación (PLAINTEXT). Abrir el 9092 a `0.0.0.0/0` es aceptable únicamente durante la demostración. En un uso real se limita a la IP de quien se conecta, o se agrega TLS y autenticación. Al terminar, se detiene la instancia.
 
 ![Security Group](docs/evidencias/e14-ec2-sg.png)
 
-**Elastic IP:** se asocia una Elastic IP a la instancia para que la dirección no cambie al detenerla. Se libera al terminar, porque una Elastic IP sin instancia asociada genera cobro.
+**Elastic IP:** en *EC2 → Direcciones IP elásticas* se asigna una dirección y se asocia a la instancia, para que no cambie al detenerla. Se libera al terminar, porque una Elastic IP sin instancia asociada genera cobro.
+
+![Elastic IP asociada a la instancia](docs/evidencias/despliegue-02-elastic-ip.png)
 
 ## 4. Instalar Docker en la EC2
 
@@ -51,6 +54,16 @@ sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 exit
 ```
 
+Verifica la instalación:
+
+```bash
+docker --version
+docker compose version
+docker ps
+```
+
+![Docker instalado en la EC2](docs/evidencias/despliegue-03-docker-instalado.png)
+
 Vuelve a conectarte por SSH para que se aplique el grupo `docker`.
 
 ## 5. Levantar Kafka
@@ -65,9 +78,14 @@ En la EC2, define la IP pública en un archivo `.env` junto al compose (Docker C
 
 ```bash
 echo "EC2_PUBLIC_IP=<EC2_IP>" > .env
+docker compose config | grep -E "EXTERNAL|image:"
 docker compose up -d
 docker compose ps
 ```
+
+El `config` confirma que la IP pública quedó interpolada en `KAFKA_ADVERTISED_LISTENERS`.
+
+![Variable EC2_PUBLIC_IP interpolada](docs/evidencias/despliegue-04-env-config.png)
 
 Puntos clave del `docker-compose.yml` de `deploy/kafka-ec2/`:
 
@@ -98,8 +116,19 @@ El `docker-compose.yml` lee la variable en `SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KA
 
 ## 7. Verificación
 
-1. Ejecuta un retiro de prueba (comando en `instrucciones.md`, sección de la Saga).
-2. En la EC2, comprueba los tópicos y los mensajes:
+1. Comprueba desde tu equipo que el puerto 9092 es alcanzable:
+
+```powershell
+Test-NetConnection <EC2_IP> -Port 9092
+```
+
+`TcpTestSucceeded : True` indica que el Security Group y el listener externo están bien.
+
+![Puerto 9092 alcanzable desde el equipo local](docs/evidencias/despliegue-05-conectividad.png)
+
+2. Ejecuta un retiro de prueba (comando en `instrucciones.md`, sección de la Saga).
+3. En la EC2, comprueba los tópicos y los mensajes:
+4. En la EC2, comprueba los tópicos y los mensajes:
 
 ```bash
 docker exec kafka kafka-topics --bootstrap-server localhost:29092 --list
@@ -109,7 +138,7 @@ docker exec kafka kafka-console-consumer --bootstrap-server localhost:29092 \
 
 ![Tópicos y mensajes en la EC2](docs/evidencias/e16-ec2-topicos.png)
 
-3. Confirma que el saldo cambió y que la transacción quedó `COMPLETADA`.
+5. Confirma que el saldo cambió y que la transacción quedó `COMPLETADA`.
 
 ![Microservicios locales conectados a la EC2](docs/evidencias/e17-ms-conectados-ec2.png)
 
